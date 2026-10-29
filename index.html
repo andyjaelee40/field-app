@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1F2A44">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Field App">
+<title>Field App</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header>
+  <div class="hrow"><h1>Field App</h1><span id="me"></span></div>
+  <select id="proj" onchange="loadProject()"><option value="">Pick a project</option></select>
+</header>
+<div class="tabs">
+  <button id="t-steps" class="on" onclick="setTab('steps')">Steps</button>
+  <button id="t-deliveries" onclick="setTab('deliveries')">Materials</button>
+  <button id="t-decisions" onclick="setTab('decisions')">Design</button>
+  <button id="t-money" onclick="setTab('money')">Money</button>
+</div>
+<div id="install"></div>
+<div id="qbar" onclick="flushQ(true)"></div>
+<div class="bar" id="filters">
+  <label><input type="checkbox" id="mineOnly" checked onchange="render()"> Mine only</label>
+  <label id="weekWrap"><input type="checkbox" id="weekOnly" checked onchange="render()"> Next 7 days</label>
+  <button class="link" onclick="loadProject()">Refresh</button>
+</div>
+<main id="list"><div class="spin">Loading…</div></main>
+<button class="fab" id="fab" onclick="openActions()" aria-label="Add">+</button>
+<div class="sheet" id="sheet" onclick="if(event.target===this)closeSheet()">
+  <div class="sheet-card"><div class="sheet-head"><b id="sheetTitle"></b><button class="x" onclick="closeSheet()" aria-label="Close">✕</button></div><div id="sheetBody"></div></div>
+</div>
+<div id="gate" class="gate"></div>
+<div id="toast"></div>
+<script src="queue.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
