@@ -12,9 +12,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="app.css?v=4">
+<link rel="stylesheet" href="app.css?v=5">
 </head>
 <body>
+<div id="app">
 <header>
   <div id="head"></div>
   <button id="sync" onclick="syncTap()"></button>
@@ -26,13 +27,16 @@
   <button id="n-add" onclick="openAdd()"><span class="plus">+</span>Add</button>
   <button id="n-projects" onclick="go('projects')"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 9.5V20h14V9.5"/></svg>Projects</button>
 </nav>
+</div>
+<!-- iPhone Safari colors the strip under the clock and the area under its own toolbar from pinned bars at the screen edges -->
+<div id="tintTop"></div><div id="tintBottom"></div>
 <div class="sheet" id="sheet" onclick="if(event.target===this)closeSheet()">
   <div class="sheet-card"><div class="sheet-head"><b id="sheetTitle"></b><button class="x" onclick="closeSheet()" aria-label="Close">✕</button></div><div id="sheetBody"></div></div>
 </div>
 <div id="gate" class="cover"></div>
 <div id="welcome" class="cover"></div>
 <div id="toast"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
-<script src="queue.js?v=4"></script>
-<script src="app.js?v=4"></script>
+<script src="queue.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

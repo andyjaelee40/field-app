@@ -1,15 +1,19 @@
 :root { --navy:#1B2540; --ink:#111827; --line:#E5E7EB; --muted:#5B6474; --bg:#F2F3F6; --blue:#1F5F8B;
   --red:#B42318; --redbg:#FDE8E7; --amb:#8A5A00; --ambbg:#FFF1CC; --grn:#0E7A3B; --grnbg:#DCF5E5; --gold:#E0A526; }
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-/* The page itself never scrolls; only main does. On iPhone that keeps the strip under the clock a solid navy (nothing
-   scrolls behind it) and keeps Safari's toolbars from sliding, which used to leave a gap under the bottom bar. */
-html { -webkit-text-size-adjust:100%; height:100%; overflow:hidden; background:var(--navy); }
-body { margin:0; position:fixed; inset:0; overflow:hidden; display:flex; flex-direction:column; font-family:-apple-system, system-ui, Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); font-size:17px; line-height:1.35; font-variant-numeric:tabular-nums; }
+/* The page never scrolls; only main does. #app is sized to the visible screen, and the two pinned tint bars tell
+   iPhone Safari to paint the strip under the clock navy and the area under its toolbar white (instead of a blur or gap). */
+html { -webkit-text-size-adjust:100%; background:#fff; overscroll-behavior:none; }
+#app { height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+#tintTop, #tintBottom { position:fixed; left:0; right:0; height:14px; pointer-events:none; z-index:15; }
+#tintTop { top:0; background:var(--navy); }
+#tintBottom { bottom:0; background:#fff; }
+body { margin:0; background:#fff; overscroll-behavior:none; font-family:-apple-system, system-ui, Roboto, Arial, sans-serif; color:var(--ink); font-size:17px; line-height:1.35; font-variant-numeric:tabular-nums; }
 button { font-family:inherit; cursor:pointer; }
 select, input, textarea { width:100%; padding:13px; font-size:17px; border:1px solid #C8CDD6; border-radius:12px; background:#fff; color:var(--ink); font-family:inherit; }
 
 /* top bar */
-header { background:var(--navy); color:#fff; padding:calc(10px + env(safe-area-inset-top)) 18px 12px; flex:0 0 auto; z-index:10; display:flex; align-items:center; gap:10px; min-height:60px; }
+header { background:var(--navy); color:#fff; padding:calc(16px + env(safe-area-inset-top)) 18px 12px; flex:0 0 auto; z-index:10; display:flex; align-items:center; gap:10px; min-height:60px; }
 #head { flex:1; min-width:0; }
 #head h1 { margin:0; font-size:23px; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #head small { display:block; color:#AEB8D0; font-size:14px; font-weight:500; margin-top:1px; }
@@ -20,7 +24,7 @@ header { background:var(--navy); color:#fff; padding:calc(10px + env(safe-area-i
 #sync.off { display:block; background:var(--ambbg); color:var(--amb); }
 
 /* bottom bar */
-nav { flex:0 0 auto; position:relative; background:#fff; border-top:1px solid var(--line); display:flex; padding:6px 8px calc(6px + env(safe-area-inset-bottom)); z-index:8; }
+nav { flex:0 0 auto; position:relative; background:#fff; border-top:1px solid var(--line); display:flex; padding:6px 8px max(16px, calc(6px + env(safe-area-inset-bottom))); z-index:8; }
 nav button { flex:1; border:0; background:none; color:var(--muted); font-size:13px; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 0; min-height:54px; }
 nav svg { width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
 nav svg { box-sizing:content-box; padding:3px 16px; border-radius:16px; }

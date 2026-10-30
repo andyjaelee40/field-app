@@ -249,7 +249,7 @@ function renderWork() {
   }
   if (prac.length) h += '<details class="prac"' + (real.length ? '' : ' open') + '><summary class="h2"><span>Practice: Example Project (' + prac.length + ')</span><span>›</span></summary>' +
     '<div class="hint" style="margin:0 4px 10px">Safe to tap anything here. It is a practice project.</div>' + prac.map(workCard).join('') + '</details>';
-  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button></div>';
+  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button><div class="hint">App version 5</div></div>';
   return h;
 }
 function workCard(x) {
