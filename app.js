@@ -345,10 +345,10 @@ function openActions() {
 
 function formProject() {
   openSheet('New project',
-    field('Project name (becomes the tab name)', '<input id="np_name" placeholder="1712 Tacoma">') +
+    field('Project name (becomes the tab name)', '<input id="np_name" placeholder="123 Main St">') +
     '<div class="two"><div>' + field('Type', '<select id="np_type">' + opts(LISTS.types || ['Residential Rehab', 'Renovation', 'New Construction', 'Commercial']) + '</select>') + '</div>' +
     '<div>' + field('Project manager', '<select id="np_pm">' + opts(TEAM, ME, true) + '</select>') + '</div></div>' +
-    field('Address', '<input id="np_addr" placeholder="1712 S 76th St, Tacoma WA">') +
+    field('Address', '<input id="np_addr" placeholder="123 Main St, Anytown WA">') +
     '<div class="two"><div>' + field('Project start', '<input id="np_start" type="date">') + '</div><div>' + field('Target finish', '<input id="np_target" type="date">') + '</div></div>' +
     '<button class="primary" id="np_go" onclick="saveProject()">Create project</button><div class="hint">Takes about 10 seconds. Needs signal.</div>');
 }
