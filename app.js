@@ -212,16 +212,12 @@ function go(name, tab) {
   VIEW = { name: name, tab: tab };
   if (name === 'project') { PTAB = 'steps'; if (!RAW[tab]) { var c = cacheGet('pcc_p_' + tab); if (c) { RAW[tab] = c; } } rebuild(); loadProject(tab); }
   else render();
-  window.scrollTo(0, 0);
+  $('view').scrollTop = 0;
 }
 function head(title, sub, back) {
   $('head').innerHTML = (back ? '<button class="back" onclick="go(\'projects\')">‹ All projects</button>' : '') +
     '<h1>' + esc(title) + '</h1>' + (sub ? '<small>' + sub + '</small>' : '');
-  fitHead();
 }
-// the top bar is fixed (a scrolling bar looks blurry under the iPhone clock), so the page starts below its height
-function fitHead() { document.documentElement.style.setProperty('--hh', document.querySelector('header').offsetHeight + 'px'); }
-window.addEventListener('resize', fitHead);
 function render() {
   V = []; REG = 'V';
   $('n-work').className = VIEW.name === 'work' ? 'on' : '';

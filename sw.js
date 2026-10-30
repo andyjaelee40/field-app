@@ -1,5 +1,5 @@
 // Keeps the app's own files on the phone so it opens with no signal. Calls to Google always go to the network.
-var VERSION = 'pcc-3';
+var VERSION = 'pcc-4';
 var FILES = ['./', 'index.html', 'app.css', 'app.js', 'queue.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {
@@ -14,7 +14,7 @@ self.addEventListener('activate', function (e) {
 self.addEventListener('fetch', function (e) {
   var u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return;
-  e.respondWith(fetch(e.request).then(function (r) {
+  e.respondWith(fetch(e.request, { cache: 'no-cache' }).then(function (r) {
     if (r.ok) { var copy = r.clone(); caches.open(VERSION).then(function (c) { c.put(e.request, copy); }); }
     return r;
   }).catch(function () {
