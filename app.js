@@ -217,7 +217,11 @@ function go(name, tab) {
 function head(title, sub, back) {
   $('head').innerHTML = (back ? '<button class="back" onclick="go(\'projects\')">‹ All projects</button>' : '') +
     '<h1>' + esc(title) + '</h1>' + (sub ? '<small>' + sub + '</small>' : '');
+  fitHead();
 }
+// the top bar is fixed (a scrolling bar looks blurry under the iPhone clock), so the page starts below its height
+function fitHead() { document.documentElement.style.setProperty('--hh', document.querySelector('header').offsetHeight + 'px'); }
+window.addEventListener('resize', fitHead);
 function render() {
   V = []; REG = 'V';
   $('n-work').className = VIEW.name === 'work' ? 'on' : '';
@@ -235,12 +239,13 @@ function renderWork() {
   var items = HOME.items.filter(function (x) { return !x.done && (WHO === 'all' || x.who === ME); });
   var real = items.filter(function (x) { return !x.practice; }), prac = items.filter(function (x) { return x.practice; });
   var c = [0, 0, 0]; real.forEach(function (x) { c[x.rank]++; });
-  var h = '<div class="who"><button class="' + (WHO === 'mine' ? 'on' : '') + '" ' + on(function () { WHO = 'mine'; render(); }) + '>Mine</button>' +
+  var h = '<div class="hero"><div class="who"><button class="' + (WHO === 'mine' ? 'on' : '') + '" ' + on(function () { WHO = 'mine'; render(); }) + '>Mine</button>' +
     '<button class="' + (WHO === 'all' ? 'on' : '') + '" ' + on(function () { WHO = 'all'; render(); }) + '>Everyone</button></div>';
+  if (real.length) h += '<div class="counts"><div class="c-late"><b>' + c[0] + '</b><span>Late</span></div><div class="c-att"><b>' + c[1] + '</b><span>Needs a look</span></div><div class="c-week"><b>' + c[2] + '</b><span>This week</span></div></div>';
+  h += '</div>';
   if (!real.length) {
     h += '<div class="empty"><div class="big">✓</div><b>You’re all caught up</b>' + (WHO === 'mine' ? 'Nothing needs you right now.' : 'Nothing needs anyone right now.') + '</div>';
   } else {
-    h += '<div class="counts"><div class="c-late"><b>' + c[0] + '</b><span>Late</span></div><div class="c-att"><b>' + c[1] + '</b><span>Needs a look</span></div><div class="c-week"><b>' + c[2] + '</b><span>This week</span></div></div>';
     [['Late', 'late', 0], ['Needs a look', 'att', 1], ['This week', '', 2]].forEach(function (g) {
       var list = real.filter(function (x) { return x.rank === g[2]; });
       if (list.length) h += '<div class="h2 ' + g[1] + '">' + g[0] + '</div>' + list.map(workCard).join('');
@@ -268,6 +273,7 @@ function workCard(x) {
 }
 
 // ---------- Projects ----------
+var HOUSE = '<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-6h4v6"/></svg>';
 function renderProjects() {
   head('Projects', HOME ? plural(HOME.projects.filter(function (p) { return !p.practice; }).length, 'project') : '');
   if (!HOME) return '<div class="spin">Loading…</div>';
@@ -275,8 +281,8 @@ function renderProjects() {
   var list = HOME.projects.slice().sort(function (a, b) { return (a.practice ? 1 : 0) - (b.practice ? 1 : 0); });
   if (!list.length) return '<div class="empty"><b>No projects yet</b>Tap <b>+ Add</b> to start one.</div>';
   return list.map(function (p) {
-    return '<button class="plist" ' + on(function () { go('project', p.tab); }) + '>' + esc(p.tab) +
-      '<small>' + (p.practice ? 'Practice project · ' : '') + esc(p.type || '') + (late[p.tab] ? ' · <span class="late">' + late[p.tab] + ' late</span>' : '') + '</small></button>';
+    return '<button class="plist" ' + on(function () { go('project', p.tab); }) + '><span class="pi' + (p.practice ? ' prac' : '') + '">' + HOUSE + '</span><span class="pt">' + esc(p.tab) +
+      '<small>' + (p.practice ? 'Practice project · ' : '') + esc(p.type || '') + (late[p.tab] ? ' · <span class="late">' + late[p.tab] + ' late</span>' : '') + '</small></span><span class="chev">›</span></button>';
   }).join('');
 }
 
