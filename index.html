@@ -16,29 +16,22 @@
 </head>
 <body>
 <header>
-  <div class="hrow"><h1>Field App</h1><span id="me"></span></div>
-  <select id="proj" onchange="loadProject()"><option value="">Pick a project</option></select>
+  <div id="head"></div>
+  <button id="sync" onclick="syncTap()"></button>
 </header>
-<div class="tabs">
-  <button id="t-steps" class="on" onclick="setTab('steps')">Steps</button>
-  <button id="t-deliveries" onclick="setTab('deliveries')">Materials</button>
-  <button id="t-decisions" onclick="setTab('decisions')">Design</button>
-  <button id="t-money" onclick="setTab('money')">Money</button>
-</div>
 <div id="install"></div>
-<div id="qbar" onclick="flushQ(true)"></div>
-<div class="bar" id="filters">
-  <label><input type="checkbox" id="mineOnly" checked onchange="render()"> Mine only</label>
-  <label id="weekWrap"><input type="checkbox" id="weekOnly" checked onchange="render()"> Next 7 days</label>
-  <button class="link" onclick="loadProject()">Refresh</button>
-</div>
-<main id="list"><div class="spin">Loading…</div></main>
-<button class="fab" id="fab" onclick="openActions()" aria-label="Add">+</button>
+<main id="view"><div class="spin">Loading…</div></main>
+<nav>
+  <button id="n-work" onclick="go('work')"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg>My Work</button>
+  <button id="n-add" onclick="openAdd()"><span class="plus">+</span>Add</button>
+  <button id="n-projects" onclick="go('projects')"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 9.5V20h14V9.5"/></svg>Projects</button>
+</nav>
 <div class="sheet" id="sheet" onclick="if(event.target===this)closeSheet()">
   <div class="sheet-card"><div class="sheet-head"><b id="sheetTitle"></b><button class="x" onclick="closeSheet()" aria-label="Close">✕</button></div><div id="sheetBody"></div></div>
 </div>
-<div id="gate" class="gate"></div>
-<div id="toast"></div>
+<div id="gate" class="cover"></div>
+<div id="welcome" class="cover"></div>
+<div id="toast"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
 <script src="queue.js"></script>
 <script src="app.js"></script>
 </body>

@@ -1,5 +1,5 @@
-// Talking to the sheet, and holding saves on the phone until there's signal.
-// Saves wait in IndexedDB (room for photos); if the phone blocks it, they wait in memory and the bar says to keep the app open.
+// Talking to the sheet, and holding saves on the phone until they're sent.
+// Saves wait in IndexedDB (room for photos); if the phone blocks it, they wait in memory and the app says to keep it open.
 
 var CFG = readConfig();
 
@@ -47,8 +47,9 @@ function api(fn, args, id) {
   }, function (e) { clearTimeout(timer); throw e; });
 }
 
+// add() resolves with the item's seq, which remove() takes
 var Store = (function () {
-  var mem = [], db = null, ready;
+  var mem = [], db = null, ready, n = 0;
   function req(r) { return new Promise(function (ok, bad) { r.onsuccess = function () { ok(r.result); }; r.onerror = function () { bad(r.error); }; }); }
   ready = new Promise(function (ok) {
     try {
@@ -59,12 +60,13 @@ var Store = (function () {
     } catch (e) { ok(); }
   });
   function tx(mode) { return db.transaction('q', mode).objectStore('q'); }
+  function toMem(item) { item.seq = 'm' + (++n); mem.push(item); return item.seq; }
   return {
     inMemory: function () { return !db; },
     add: function (item) {
       return ready.then(function () {
-        if (!db) { item.seq = Date.now() + Math.random(); mem.push(item); return; }
-        return req(tx('readwrite').add(item)).catch(function () { item.seq = Date.now() + Math.random(); mem.push(item); });
+        if (!db) return toMem(item);
+        return req(tx('readwrite').add(item)).catch(function () { return toMem(item); });
       });
     },
     all: function () {
@@ -73,7 +75,7 @@ var Store = (function () {
     },
     remove: function (seq) {
       mem = mem.filter(function (x) { return x.seq !== seq; });
-      return ready.then(function () { if (db) return req(tx('readwrite').delete(seq)).catch(function () {}); });
+      return ready.then(function () { if (db && typeof seq === 'number') return req(tx('readwrite').delete(seq)).catch(function () {}); });
     }
   };
 })();
