@@ -3,12 +3,13 @@
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 /* The page never scrolls; only main does. #app is sized to the visible screen, and the two pinned tint bars tell
    iPhone Safari to paint the strip under the clock navy and the area under its toolbar white (instead of a blur or gap). */
-html { -webkit-text-size-adjust:100%; background:#fff; overscroll-behavior:none; }
-#app { height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; }
+/* iOS takes the color of the haze under the clock from the base background, so it must be navy (the app covers it everywhere else) */
+html { -webkit-text-size-adjust:100%; background:var(--navy); overscroll-behavior:none; }
+#app { height:100vh; height:100dvh; background:#fff; display:flex; flex-direction:column; overflow:hidden; }
 #tintTop, #tintBottom { position:fixed; left:0; right:0; height:14px; pointer-events:none; z-index:15; }
 #tintTop { top:0; background:var(--navy); }
 #tintBottom { bottom:0; background:#fff; }
-body { margin:0; background:#fff; overscroll-behavior:none; font-family:-apple-system, system-ui, Roboto, Arial, sans-serif; color:var(--ink); font-size:17px; line-height:1.35; font-variant-numeric:tabular-nums; }
+body { margin:0; background:var(--navy); overscroll-behavior:none; font-family:-apple-system, system-ui, Roboto, Arial, sans-serif; color:var(--ink); font-size:17px; line-height:1.35; font-variant-numeric:tabular-nums; }
 button { font-family:inherit; cursor:pointer; }
 select, input, textarea { width:100%; padding:13px; font-size:17px; border:1px solid #C8CDD6; border-radius:12px; background:#fff; color:var(--ink); font-family:inherit; }
 
