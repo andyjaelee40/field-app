@@ -249,7 +249,7 @@ function renderWork() {
   }
   if (prac.length) h += '<details class="prac"' + (real.length ? '' : ' open') + '><summary class="h2"><span>Practice: Example Project (' + prac.length + ')</span><span>›</span></summary>' +
     '<div class="hint" style="margin:0 4px 10px">Safe to tap anything here. It is a practice project.</div>' + prac.map(workCard).join('') + '</details>';
-  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button><div class="hint">App version 8</div></div>';
+  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button><div class="hint">App version 9</div></div>';
   return h;
 }
 function workCard(x) {
@@ -278,7 +278,7 @@ function renderProjects() {
   var arch = HOME.archived || [];
   var archived = arch.length ? '<details class="prac"><summary class="h2"><span>Archived (' + arch.length + ')</span><span>›</span></summary>' +
     arch.map(function (a) { return '<div class="arow"><b>' + esc(a.tab) + '</b><small>Archived ' + esc(a.closed) + '</small></div>'; }).join('') +
-    '<div class="hint" style="margin:4px 4px 0">Full copies are in the Project Command Center Archive file. Final numbers are on the Results tab.</div></details>' : '';
+    '<div class="hint" style="margin:4px 4px 0">Andy can restore one for 90 days from the sheet: Projects menu, Restore Archived Project. Read-only copies stay in the Archive file for good.</div></details>' : '';
   if (!list.length) return '<div class="empty"><b>No projects yet</b>Tap <b>+ Add</b> to start one.</div>' + archived;
   return list.map(function (p) {
     return '<button class="plist" ' + on(function () { go('project', p.tab); }) + '><span class="pi' + (p.practice ? ' prac' : '') + '">' + HOUSE + '</span><span class="pt">' + esc(p.tab) +
@@ -315,7 +315,7 @@ function archiveSheet(tab) {
       '<ul class="ticks"><li>It comes off everyone’s phone, the Dashboard, This Week and the 7am email.</li>' +
       '<li>A full copy is saved in the <b>Project Command Center Archive</b> file, and its final numbers go on the <b>Results</b> tab.</li>' +
       '<li>The Drive folder, photos and receipts stay where they are.</li></ul>' +
-      '<div class="note">You can’t undo this from the phone. Andy can still open the archived copy in Google Sheets.</div>' +
+      '<div class="note">You can’t undo this from the phone. For 90 days Andy can bring it back exactly as it was from the sheet (Projects menu, Restore Archived Project).</div>' +
       '<button class="primary danger" id="ar_go" ' + on(function () { doArchive(tab); }) + '>Archive project</button>' +
       '<button class="primary soft" onclick="closeSheet()">Keep it</button><div class="hint">Takes about 20 seconds. Needs signal.</div>';
   });
