@@ -34,7 +34,7 @@ function api(fn, args, id) {
   return fetch('https://script.google.com/macros/s/' + encodeURIComponent(CFG.a) + '/exec', {
     method: 'POST', redirect: 'follow', signal: ctl ? ctl.signal : undefined,
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },     // keeps it a simple request, no CORS preflight
-    body: JSON.stringify({ k: CFG.k, fn: fn, args: args || [], id: id || '' })
+    body: JSON.stringify({ k: CFG.k, fn: fn, args: args || [], id: id || '', l: typeof LANG === 'string' ? LANG : 'en' })
   }).then(function (r) {
     if (!r.ok) throw Object.assign(new Error('The server is busy (' + r.status + '). Try again in a minute.'), { net: r.status >= 500 || r.status === 429 });
     return r.json();

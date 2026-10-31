@@ -21,7 +21,19 @@ function store(k, v) { try { if (v === undefined) return localStorage.getItem(k)
 function cacheGet(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
 function cachePut(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 function clone(x) { return x ? JSON.parse(JSON.stringify(x)) : x; }
+var APP_V = 15;
+// Anything that breaks on a phone goes to the App Errors tab (a few per session at most), so it gets fixed without anyone reporting it
+var ERR_SENT = 0;
+function reportError(msg, where) {
+  if (ERR_SENT >= 5 || !msg || typeof CFG === 'undefined' || !CFG) return;
+  ERR_SENT++;
+  try { api('fieldLogError', [{ msg: String(msg).slice(0, 400), where: String(where || '').slice(0, 200) + ' · ' + (navigator.userAgent || '').slice(0, 80), v: APP_V }]).catch(function () {}); } catch (e) {}
+}
+window.addEventListener('error', function (e) { reportError(e.message, (e.filename || '').split('/').pop() + ':' + e.lineno); });
+window.addEventListener('unhandledrejection', function (e) { var r = e.reason; if (r && (r.net || r.code)) return; reportError(r && r.message || r, 'promise'); });
 function same(a, b) { return String(a) === String(b); }
+// a step or material name in the phone's language (the server adds .es on Spanish phones; the sheet stays English)
+function nm(x, k) { return LANG === 'es' && x.es ? x.es : x[k || 'name']; }
 function plural(n, w) { return tn(n, w); }
 
 // Click handlers for generated HTML. on(fn) gives an onclick that calls fn, without putting names in strings.
@@ -183,6 +195,15 @@ function effectLabor(it) {
   var others = mine.reduce(function (s, x) { return s + x.days; }, 0);
   HOME.myDay = (others + p.days > 1 ? [] : mine).concat([{ project: p.project, days: p.days }]);
 }
+function effectSplit(it) {
+  if (it.fn !== 'fieldSplitReceipt') return;
+  (it.args[0].parts || []).forEach(function (x) {
+    if (x.item) return;
+    if (SHOP && !(it.sentAt < SHOP_AT)) SHOP = SHOP.filter(function (y) { return !(y.project === x.project && lineMatch(y, x.row, x.n)); });
+    var d = PROJ[x.project];
+    if (d && !(it.sentAt < (RAW_AT[x.project] || 0))) (d.deliveries || []).forEach(function (y) { if (lineMatch(y, x.row, x.n)) { y.status = 'Delivered'; y.done = true; y.flag = ''; y.got = t('today'); } });
+  });
+}
 function effectShop(it) {
   if (!SHOP || (it.fn !== 'fieldReceive' && it.fn !== 'fieldOrdered' && it.fn !== 'fieldEditMaterial')) return;
   var a = it.args, p = a[2] || {};
@@ -197,6 +218,7 @@ function rebuild() {
   SENT.concat(QUEUE).forEach(function (it) {
     if (!(it.sentAt < HOME_AT)) { effectHome(it); effectLabor(it); }
     if (!(it.sentAt < SHOP_AT)) effectShop(it);
+    effectSplit(it);
     var tab = it.args && it.args[0];
     if (typeof tab === 'string' && !(it.sentAt < (RAW_AT[tab] || 0))) effectProj(it);
   });
@@ -314,7 +336,7 @@ function renderWork() {
   }
   if (prac.length) h += '<details class="prac"' + (real.length ? '' : ' open') + '><summary class="h2"><span>' + t('Practice: Example Project') + ' (' + prac.length + ')</span><span>›</span></summary>' +
     '<div class="hint" style="margin:0 4px 10px">' + t('Safe to tap anything here. It is a practice project.') + '</div>' + prac.map(workCard).join('') + '</details>';
-  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">' + t('Refresh') + '</button><div class="hint">' + t('App version') + ' 14</div></div>';
+  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">' + t('Refresh') + '</button><div class="hint">' + t('App version') + ' ' + APP_V + '</div></div>';
   return h;
 }
 function workCard(x) {
@@ -329,7 +351,7 @@ function workCard(x) {
   else b = '<button class="go soft" ' + on(function () { go('project', x.project); PTAB = x.kind === 'budget' || x.kind === 'pay' || x.kind === 'con' ? 'money' : 'steps'; render(); }) + '>' + t('Open project') + '</button>';
   return '<div class="card r' + x.rank + '"><div class="kick"><span class="tag' + (x.practice ? ' prac' : '') + '">' + kindName(x.kind) + '</span>' + esc(x.project) +
     (WHO === 'all' && x.who ? ' · ' + esc(x.who) : '') + '</div>' +
-    '<div class="title">' + esc(x.item) + '</div><div class="why">' + esc(whatTxt(x.what)) + (x.kind === 'step' && x.status === 'Started' ? ' · ' + t('Started') : '') + '</div>' + b +
+    '<div class="title">' + esc(nm(x, 'item')) + '</div><div class="why">' + esc(whatTxt(x.what)) + (x.kind === 'step' && x.status === 'Started' ? ' · ' + t('Started') : '') + '</div>' + b +
     (x.kind === 'step' ? '<button class="more" ' + on(function () { stepSheet(x.project, x.row, x.n); }) + '>' + t('Running late, photo or note') + ' ›</button>' : '') + '</div>';
 }
 
@@ -341,21 +363,104 @@ function renderShop() {
   var shown = list.filter(function (x) { return !SHOP_PROJ || x.project === SHOP_PROJ; });
   head(t('Shopping list'), SHOP ? tn(shown.length, 'item') + ' ' + t('to buy') : '', 'work');
   if (!SHOP) return '<div class="spin">' + (OFFLINE ? t('No signal, and the list has not been loaded on this phone yet.') : t('Loading…')) + '</div>';
-  if (!list.length) return '<div class="empty"><div class="big">✓</div><b>' + t('Nothing to buy') + '</b>' + t('Every material on every job is ordered or in hand.') + '</div>';
-  var h = projects.length > 1 ? '<div class="seg">' + [''].concat(projects).map(function (p) {
+  var split = CREW ? '' : '<button class="btn" style="width:100%;margin-bottom:10px" ' + on(function () { splitReceipt(); }) + '>🧾 ' + t('One receipt, several items') + '</button>';
+  if (!list.length) return split + '<div class="empty"><div class="big">✓</div><b>' + t('Nothing to buy') + '</b>' + t('Every material on every job is ordered or in hand.') + '</div>';
+  var h = split + (projects.length > 1 ? '<div class="seg">' + [''].concat(projects).map(function (p) {
     return '<button class="' + (SHOP_PROJ === p ? 'on' : '') + '" ' + on(function () { SHOP_PROJ = p; render(); }) + '>' + (p ? esc(p) : t('All jobs')) + '</button>';
-  }).join('') + '</div>' : '';
+  }).join('') + '</div>' : '');
   h += '<div class="hint" style="margin:0 4px 6px">' + t('Tap an item once it is in your cart. It is marked received on its job.') + '</div>';
   var stores = [], by = {};
   shown.forEach(function (x) { var s = x.vendor || t('No store set'); if (!by[s]) { by[s] = []; stores.push(s); } by[s].push(x); });
   stores.forEach(function (s) {
-    h += '<div class="h2">' + esc(s) + ' (' + by[s].length + ')</div><div class="mlist">' + by[s].map(function (x) {
+    var items = by[s], multi = projects.length > 1 && !SHOP_PROJ;
+    h += '<div class="h2 shoph"><span>' + esc(s) + ' (' + items.length + ')</span><span>' +
+      '<button class="linkbtn" ' + on(function () { textList(s, items, multi); }) + '>' + t('Text it') + '</button>' +
+      '<button class="linkbtn" ' + on(function (e, el) { allOrdered(items, el); }) + '>' + t('All ordered') + '</button></span></div><div class="mlist">' + items.map(function (x) {
       var meta = [projects.length > 1 && !SHOP_PROJ ? x.project : '', x.qty && x.qty !== 1 ? t('qty') + ' ' + x.qty : '', x.needed ? t('needed') + ' ' + dayTxt(x.needed) : ''].filter(Boolean).map(esc).join(' · ');
-      return '<div class="pick" ' + on(function () { bought(x); }) + '><i class="chk"></i><span class="pt"><b>' + esc(x.name) + '</b><small>' + meta + '</small></span>' + flagHtml(x.flag) + '</div>';
+      return '<div class="pick" ' + on(function () { bought(x); }) + '><i class="chk"></i><span class="pt"><b>' + esc(nm(x)) + '</b><small>' + meta + '</small></span>' + flagHtml(x.flag) + '</div>';
     }).join('') + '</div>';
   });
   h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" ' + on(function () { loadShop().then(function () { toast(t('Up to date')); }); }) + '>' + t('Refresh') + '</button></div>';
   return h;
+}
+// One store's list as a text message for whoever is making the run
+function textList(store, items, multi) {
+  var txt = store + ':\n' + items.map(function (x) { return '- ' + nm(x) + (x.qty && x.qty !== 1 ? ' x' + x.qty : '') + (multi ? ' (' + x.project + ')' : ''); }).join('\n');
+  if (navigator.share) navigator.share({ text: txt }).catch(function () {});
+  else location.href = 'sms:?&body=' + encodeURIComponent(txt);
+}
+function allOrdered(items, el) {
+  if (el.getAttribute('data-sure') !== '1') { el.setAttribute('data-sure', '1'); el.textContent = t('Tap again: {n} ordered', { n: items.length }); return; }
+  items.slice().forEach(function (x) { save('fieldOrdered', [x.project, x.row, { n: x.n }], t('Ordered') + ' · ' + x.name); });
+  toast(t('{n} marked ordered', { n: items.length }));
+}
+
+// ---------- one receipt, several items (one job or several) ----------
+function splitReceipt() {
+  var parts = [], open = null, q = '';
+  var left = function () {
+    var tot = Number($('sp_total').value) || 0, sum = parts.reduce(function (a, x) { return a + (Number(x.amount) || 0); }, 0);
+    $('sp_left').textContent = tot ? (Math.abs(tot - sum) < 0.005 ? t('Adds up to the receipt') : t('Left to split: {x}', { x: '$' + (tot - sum).toFixed(2) })) : (sum ? t('Total: {x}', { x: '$' + sum.toFixed(2) }) : '');
+  };
+  var draw = function () {
+    $('sp_parts').innerHTML = parts.length ? parts.map(function (x, i) {
+      return '<div class="sprow"><span><b>' + esc(x.item || nm(x)) + '</b><small>' + esc(x.project) + (x.item ? ' · ' + t('new') : '') + '</small></span>' +
+        '<input type="number" inputmode="decimal" min="0" step="0.01" data-i="' + i + '" value="' + esc(x.amount === '' ? '' : x.amount) + '" placeholder="$"><button class="x" data-x="' + i + '">×</button></div>';
+    }).join('') : '<div class="hint">' + t('Nothing picked yet. Tap the items below that are on this receipt.') + '</div>';
+    left();
+    var have = {}; parts.forEach(function (x) { if (!x.item) have[x.project + '|' + x.row] = 1; });
+    var list = (open || []).filter(function (x) { return !have[x.project + '|' + x.row] && (!q || (x.name + ' ' + (x.es || '') + ' ' + x.project + ' ' + x.vendor).toLowerCase().indexOf(q) > -1); });
+    $('sp_open').innerHTML = open === null ? '<div class="spin">' + t('Loading…') + '</div>' : list.length ? list.slice(0, 60).map(function (x) {
+      return '<div class="pick" data-k="' + esc(x.project + '|' + x.row) + '"><span class="pt"><b>' + esc(nm(x)) + '</b><small>' + esc(x.project) + ' · ' + esc(t(x.status || 'Needed')) + (x.vendor ? ' · ' + esc(x.vendor) : '') + '</small></span><span class="chev">+</span></div>';
+    }).join('') : '<div class="hint">' + t('Nothing matches.') + '</div>';
+  };
+  openSheet(t('One receipt, several items'), function () {
+    return priceBlock('sp') + '<div class="sec">' + t('On this receipt') + '</div><div id="sp_parts"></div><div class="bgtop"><span id="sp_left"></span>' +
+      '<button class="linkbtn" id="sp_even">' + t('Split the rest evenly') + '</button></div>' +
+      '<button class="primary" id="sp_go">' + t('Save') + '</button>' +
+      '<div class="sec">' + t('Open items on every job') + '</div><input id="sp_q" placeholder="' + esc(t('Search all materials')) + '" autocomplete="off">' +
+      '<div class="mlist" id="sp_open" style="margin-top:8px"></div>' +
+      '<details style="margin-top:12px"><summary class="linkbtn">+ ' + t('Something not on any list') + '</summary>' +
+      field(t('Project'), '<select id="sp_np">' + opts(HOME.projects.filter(function (p) { return !p.practice; }).map(function (p) { return p.tab; }), '', true) + '</select>') +
+      field(t('What is it?'), '<input id="sp_ni">') + '<button class="btn" style="width:100%;margin-top:8px" id="sp_add">' + t('Add to this receipt') + '</button></details>';
+  });
+  priceWire('sp');
+  $('sp_total').addEventListener('input', left);
+  $('sp_q').oninput = function () { q = this.value.trim().toLowerCase(); draw(); };
+  $('sp_open').onclick = function (e) {
+    var r = e.target.closest('.pick'); if (!r) return;
+    var k = r.getAttribute('data-k'), x = open.filter(function (y) { return y.project + '|' + y.row === k; })[0];
+    if (x) { parts.push({ project: x.project, row: x.row, n: x.n, name: x.name, es: x.es, amount: '' }); draw(); }
+  };
+  $('sp_parts').oninput = function (e) { var i = e.target.getAttribute('data-i'); if (i !== null) { parts[i].amount = e.target.value; left(); } };
+  $('sp_parts').onclick = function (e) { var i = e.target.getAttribute('data-x'); if (i !== null) { parts.splice(Number(i), 1); draw(); } };
+  $('sp_even').onclick = function () {
+    var tot = Number($('sp_total').value) || 0, blank = parts.filter(function (x) { return x.amount === '' || x.amount === undefined; });
+    var used = parts.reduce(function (a, x) { return a + (Number(x.amount) || 0); }, 0);
+    if (!tot) { toast(t('Type the receipt total first, or scan it.')); return; }
+    if (!blank.length) blank = parts;
+    if (blank === parts) used = 0;
+    var each = Math.floor((tot - used) / blank.length * 100) / 100, rest = Math.round((tot - used - each * blank.length) * 100) / 100;
+    blank.forEach(function (x, i) { x.amount = (each + (i === 0 ? rest : 0)).toFixed(2); });
+    draw();
+  };
+  $('sp_add').onclick = function () {
+    var pj = $('sp_np').value, it = $('sp_ni').value.trim();
+    if (!need(pj, t('Pick the job.')) || !need(it, t('Say what the material is.'))) return;
+    parts.push({ project: pj, item: it, amount: '' }); $('sp_ni').value = ''; draw();
+  };
+  $('sp_go').onclick = function () {
+    if (!parts.length) { toast(t('Pick what the receipt was for.')); return; }
+    var tot = Number($('sp_total').value) || 0, sum = parts.reduce(function (a, x) { return a + (Number(x.amount) || 0); }, 0);
+    if (parts.some(function (x) { return x.amount === '' || isNaN(Number(x.amount)); })) { toast(t('Type an amount for each item (0 is fine).')); return; }
+    if (tot && Math.abs(tot - sum) > 0.01) { toast(t('The items add up to {a}, the receipt says {b}.', { a: '$' + sum.toFixed(2), b: '$' + tot.toFixed(2) }), 5000); return; }
+    var p = { vendor: $('sp_vendor').value.trim(), parts: parts.map(function (x) { return x.item ? { project: x.project, item: x.item, amount: Number(x.amount) } : { project: x.project, row: x.row, n: x.n, name: x.name, amount: Number(x.amount) }; }) };
+    if (RECEIPT) { p.name = RECEIPT.name; p.mime = RECEIPT.mime; p.data = RECEIPT.data; }
+    closeSheet();
+    save('fieldSplitReceipt', [p], t('Receipt') + ' · ' + tn(parts.length, 'item'), t('Receipt split across {x}', { x: tn(parts.length, 'item') }));
+  };
+  draw();
+  api('fieldOpenMaterials', []).then(function (r) { open = r; if ($('sp_open')) draw(); }, function (e) { open = (SHOP || []).slice(); if ($('sp_open')) draw(); if (!e.net) fail(e); });
 }
 function bought(x) {
   openSheet(t('Bought: {x}', { x: x.name }), function () {
@@ -389,7 +494,7 @@ function priceWire(id) {
       RECEIPT = f; $(id + '_lbl').className = 'photo scan has'; $(id + '_read').textContent = t('Reading the receipt…');
       api('fieldReadReceipt', [{ data: f.data, mime: f.mime }]).then(function (r) {
         if (!$(id + '_read')) return;
-        if (r.total && !$(id + '_total').value) $(id + '_total').value = r.total;
+        if (r.total && !$(id + '_total').value) { $(id + '_total').value = r.total; $(id + '_total').dispatchEvent(new Event('input')); }
         if (r.vendor && !$(id + '_vendor').value) $(id + '_vendor').value = r.vendor;
         $(id + '_read').textContent = r.found ? t('Read it: {x}. Check it and fix anything that is off.', { x: [r.vendor, r.total ? '$' + Number(r.total).toFixed(2) : '', r.date].filter(Boolean).join(' · ') })
           : t('Could not read this one. The photo is kept as the receipt; fill in the rest.');
@@ -413,11 +518,22 @@ function checkinSheet() {
       '<button class="primary" ' + on(function () {
         if (!need(pick.project, t('Pick the job.'))) return;
         closeSheet();
-        save('fieldLaborCheckIn', [{ project: pick.project, days: pick.days, date: today() }], t('Check in') + ' · ' + pick.project,
-          t('Checked in: {x}', { x: pick.project + (pick.days === 0.5 ? ' (' + t('half day') + ')' : '') }));
+        var p = { project: pick.project, days: pick.days, date: today() };
+        whereAmI(function (pos) {
+          if (pos) { p.lat = pos.lat; p.lng = pos.lng; p.acc = pos.acc; }
+          save('fieldLaborCheckIn', [p], t('Check in') + ' · ' + pick.project, t('Checked in: {x}', { x: pick.project + (pick.days === 0.5 ? ' (' + t('half day') + ')' : '') }));
+        });
       }) + '>' + t('Check in') + '</button>' +
-      '<div class="hint">' + t('Worked two jobs today? Check in a half day at each.') + '</div>';
+      '<div class="hint">' + t('Worked two jobs today? Check in a half day at each.') + ' ' + t('If your phone asks, allow location: it only records how far you are from the job, once, when you check in.') + '</div>';
   });
+}
+// The phone's location once, or null after a few seconds, if it is off, or if the person says no. Never blocks a check in.
+function whereAmI(done) {
+  var fin = false, end = function (v) { if (!fin) { fin = true; done(v); } };
+  if (!navigator.geolocation) return end(null);
+  setTimeout(function () { end(null); }, 8000);
+  try { navigator.geolocation.getCurrentPosition(function (p) { end({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) }); }, function () { end(null); }, { enableHighAccuracy: true, timeout: 7000, maximumAge: 120000 }); }
+  catch (e) { end(null); }
 }
 function mondayOf(ymd) { var d = new Date(ymd + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7); return d.toISOString().slice(0, 10); }
 function addDays(ymd, n) { var d = new Date(ymd + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
@@ -468,9 +584,13 @@ function renderLabor() {
     if (!rows.length) continue;
     h += '<div class="sec">' + esc(dayName(day)) + '</div><div class="mlist">' + rows.map(function (x) {
       return '<div class="pick" ' + on(function () { laborEdit(x); }) + '><span class="pt"><b>' + esc(x.worker) + '</b><small>' + esc(x.project) + ' · ' + (x.days === 0.5 ? t('half day') : t('full day')) +
-        (x.paid ? ' · ' + t('paid') : '') + '</small></span><span class="amt1">' + money(x.cost) + '</span></div>';
+        (x.paid ? ' · ' + t('paid') : '') + (x.where ? '<br>' + esc(whereTxt(x.where)) : '') + '</small></span><span class="amt1">' + money(x.cost) + '</span></div>';
     }).join('') + '</div>';
   }
+  var ytd = d.ytd || {}, yn = Object.keys(ytd).sort();
+  if (yn.length) h += '<div class="h2">' + t('This year so far') + '</div><div class="mlist">' + yn.map(function (n) {
+    return '<div class="mrow pay"><b>' + esc(n) + '<span>' + money(ytd[n].cost) + '</span></b><small>' + t('{d} days', { d: fmtDays(ytd[n].days) }) + (ytd[n].cost >= 600 ? ' · ' + t('$600 or more: may need a 1099') : '') + '</small></div>';
+  }).join('') + '</div>';
   h += '<button class="btn" style="width:100%;margin-top:14px" ' + on(function () { laborEdit(null); }) + '>+ ' + t('Add a day') + '</button>';
   if (unpaid > 0) h += '<button class="primary" id="lw_paid" ' + on(function (e, el) {
     if (el.getAttribute('data-sure') !== '1') { el.setAttribute('data-sure', '1'); el.textContent = t('Tap again: mark {x} paid', { x: money(unpaid) }); return; }
@@ -478,6 +598,7 @@ function renderLabor() {
   }) + '>' + t('Mark this week paid') + '</button>';
   return h;
 }
+function whereTxt(w) { var m = String(w).split(' · ')[0]; return LANG !== 'es' ? m : m.replace(/^On site/, 'En la obra').replace(/ mi from job$/, ' mi de la obra').replace(/^At /, 'En '); }
 function laborEdit(x) {
   var e = x ? { id: x.id, date: x.date, worker: x.worker, project: x.project, days: x.days } : { id: '', date: today(), worker: '', project: '', days: 1 };
   openSheet(x ? t('Change this day') : t('Add a day'), function () {
@@ -590,7 +711,7 @@ function stepRow(tab, s) {
   var st = s.status, cls = st === 'Started' ? 'st' : st === 'Complete' ? 'cp' : 'ns';
   var label = st === 'Started' ? t('Done') : st === 'Complete' ? '✓ ' + t('Done') : t('Start');
   var tap = st === 'Complete' ? function () { stepSheet(tab, s.row, s.n); } : function () { setStatus(tab, s.row, s.n, st === 'Started' ? 'Complete' : 'Started', s.name); };
-  return '<div class="srow"><button class="sinfo" ' + on(function () { stepSheet(tab, s.row, s.n); }) + '><b>' + esc(s.name) + '</b>' +
+  return '<div class="srow"><button class="sinfo" ' + on(function () { stepSheet(tab, s.row, s.n); }) + '><b>' + esc(nm(s)) + '</b>' +
     '<small>' + esc(dayTxt(s.start)) + (s.finish && s.finish !== s.start ? ' → ' + esc(dayTxt(s.finish)) : '') + (s.who ? ' · ' + esc(s.who) : '') + (s.delay ? ' · ' + tn(s.delay, 'day') + ' ' + t('delay') : '') + '</small>' +
     flagHtml(s.flag) + '</button><button class="sbtn ' + cls + '" ' + on(tap) + '>' + label + '</button></div>';
 }
@@ -618,8 +739,8 @@ function renderDeliveries(tab, d) {
   var card = function (x, k) {
     var meta = [x.vendor, x.qty && x.qty !== 1 ? t('qty') + ' ' + x.qty : '', x.step ? t('step') + ' ' + x.step : '', k === 'way' && x.eta ? t('arrives') + ' ' + dayTxt(x.eta) : '', k === 'need' && x.needed ? t('needed') + ' ' + dayTxt(x.needed) : '']
       .filter(Boolean).map(esc).join(' · ');
-    if (k === 'have') return '<div class="mrow tap" ' + on(function () { editMaterial(tab, x); }) + '><b>' + esc(x.name) + '<span class="edit">' + t('Edit') + '</span></b><small>' + (x.status === 'Installed' ? t('Installed') : t('In hand')) + (x.stored ? ' · ' + esc(x.stored) : '') + (x.got ? ' · ' + esc(dayTxt(x.got)) : '') + '</small></div>';
-    return '<div class="card"><div class="title tapedit" style="margin-top:0" ' + on(function () { editMaterial(tab, x); }) + '>' + esc(x.name) + '<span class="edit">' + t('Edit') + '</span></div><div class="why">' + (meta || esc(t(x.status || 'Needed'))) + (k === 'way' && x.status !== 'Ordered' ? ' · ' + esc(t(x.status)) : '') + '</div>' + flagHtml(x.flag) +
+    if (k === 'have') return '<div class="mrow tap" ' + on(function () { editMaterial(tab, x); }) + '><b>' + esc(nm(x)) + '<span class="edit">' + t('Edit') + '</span></b><small>' + (x.status === 'Installed' ? t('Installed') : t('In hand')) + (x.stored ? ' · ' + esc(x.stored) : '') + (x.got ? ' · ' + esc(dayTxt(x.got)) : '') + '</small></div>';
+    return '<div class="card"><div class="title tapedit" style="margin-top:0" ' + on(function () { editMaterial(tab, x); }) + '>' + esc(nm(x)) + '<span class="edit">' + t('Edit') + '</span></div><div class="why">' + (meta || esc(t(x.status || 'Needed'))) + (k === 'way' && x.status !== 'Ordered' ? ' · ' + esc(t(x.status)) : '') + '</div>' + flagHtml(x.flag) +
       (k === 'need'
         ? '<div class="row"><button class="go soft" style="margin:0" ' + on(function () { orderedTap(tab, x); }) + '>' + t('Ordered') + '</button><button class="go" style="margin:0" ' + on(function () { receiveSheet(tab, x.row, x.n, x.name); }) + '>' + t('Got it') + '</button></div>'
         : '<button class="go" ' + on(function () { receiveSheet(tab, x.row, x.n, x.name); }) + '>' + t('I got it') + '</button>') + '</div>';
@@ -776,7 +897,7 @@ function removeCatalogItem(m) {
 }
 // ---------- Change one material on a job: name, store, qty, step, where it is kept (crew: only where it is kept) ----------
 function editLocal(x, p) {
-  if (p.name !== undefined) x.name = p.name;
+  if (p.name !== undefined) { x.name = p.name; delete x.es; }
   if (p.vendor !== undefined) x.vendor = p.vendor;
   if (p.qty !== undefined) x.qty = Number(p.qty) > 0 ? Number(p.qty) : 1;
   if (p.step !== undefined) x.step = p.step;
@@ -916,7 +1037,8 @@ function renderMoney(tab, d) {
   if (d.budget > 0) h += '<div class="sum"><div><b>' + money(d.budget) + '</b><span>' + t('Budget') + '</span></div><div><b>' + money(d.spent) + '</b><span>' + t('Spent') + '</span></div>' +
     '<div><b style="color:' + (d.remaining < 0 ? 'var(--red)' : 'var(--grn)') + '">' + money(d.remaining) + '</b><span>' + (d.remaining < 0 ? t('Over') : t('Left')) + '</span></div></div>';
   else h += '<div class="note">' + t('No budget entered yet. Spent so far: <b>{x}</b>', { x: money(d.spent) }) + '</div>';
-  h += '<button class="btn" style="width:100%;margin-top:8px" ' + on(function () { budgetSheet(tab); }) + '>' + (d.budget > 0 ? t('Change the budget') : t('Set the budget')) + '</button>';
+  h += '<button class="btn" style="width:100%;margin-top:8px" ' + on(function () { budgetSheet(tab); }) + '>' + (d.budget > 0 ? t('Change the budget') : t('Set the budget')) + '</button>' +
+    '<button class="btn" style="width:100%;margin-top:8px" ' + on(function () { reportSheet(tab); }) + '>📄 ' + t('Progress report for a client or lender') + '</button>';
   if (d.labor) {
     var lb = d.labor;
     h += '<div class="h2">' + t('Labor') + '</div><div class="sum"><div><b>' + money(lb.budget) + '</b><span>' + t('Labor budget') + '</span></div><div><b>' + money(lb.spent) + '</b><span>' + t('Labor spent') + '</span></div>' +
@@ -957,18 +1079,19 @@ function budgetSheet(tab, then) {
     var phases = [], by = {};
     d.steps.forEach(function (s) { if (!by[s.phase]) { by[s.phase] = []; phases.push(s.phase); } by[s.phase].push(s); });
     return '<div class="sub">' + esc(tab) + '</div><div class="bgtop"><span>' + t('Total budget') + '</span><b id="bg_total">$0</b></div>' +
-      '<div class="hint">' + t('Whole dollars per step. Leave blank for steps with no cost.') + '</div>' +
+      '<div class="hint">' + t('Whole dollars per step. Leave blank for steps with no cost.') + '</div><div id="bg_hints"></div>' +
       '<div class="bgrow lab"><span><b>' + t('Labor (crew days)') + '</b></span><input id="bg_labor" type="number" inputmode="numeric" min="0" step="1" data-o="' + esc(d.labor ? d.labor.budget || '' : '') + '" value="' + esc(d.labor ? d.labor.budget || '' : '') + '"></div>' +
       '<div id="bg_list">' +
       phases.map(function (ph) {
         return '<div class="sec">' + esc(ph) + '</div>' + by[ph].map(function (s) {
-          return '<div class="bgrow"><span>' + esc(s.name) + '</span><input type="number" inputmode="numeric" min="0" step="1" data-r="' + s.row + '" data-o="' + esc(s.budget) + '" value="' + esc(s.budget) + '"></div>';
+          return '<div class="bgrow"><span>' + esc(nm(s)) + '<small class="bghint" data-c="' + esc(s.code) + '"></small></span><input type="number" inputmode="numeric" min="0" step="1" data-r="' + s.row + '" data-c="' + esc(s.code) + '" data-o="' + esc(s.budget) + '" value="' + esc(s.budget) + '"></div>';
         }).join('');
       }).join('') + '</div>' +
       '<div class="pkbar"><button class="primary" id="bg_go">' + t('Save budget') + '</button></div>';
   });
   total();
   $('bg_list').oninput = total; $('bg_labor').oninput = total;
+  api('fieldBudgetHints', [tab]).then(function (r) { if ($('bg_hints')) budgetHints(r, total); }, function () {});
   $('bg_go').onclick = function () {
     var b = this, ch = [].slice.call(document.querySelectorAll('#bg_list input')).filter(function (i) { return i.value !== i.getAttribute('data-o'); })
       .map(function (i) { return [Number(i.getAttribute('data-r')), i.value === '' ? '' : Number(i.value)]; });
@@ -979,6 +1102,46 @@ function budgetSheet(tab, then) {
       toast(t('Budget saved: {x} total', { x: money(r.budget) })); loadProject(tab); refresh();
       if (then) then(); else closeSheet();
     }, function (e) { b.disabled = false; b.textContent = t('Save budget'); fail(e); });
+  };
+}
+
+// What other jobs of this type budgeted per step, under each step, and one tap to fill the blanks with it
+function budgetHints(r, total) {
+  var n = 0;
+  [].forEach.call(document.querySelectorAll('#bg_list .bghint'), function (el) {
+    var x = r.steps[el.getAttribute('data-c')];
+    if (x) { el.textContent = t('Past jobs: about {x}', { x: money(x.mid) }) + (x.jobs > 1 ? ' (' + tn(x.jobs, 'job') + ')' : ''); n++; }
+  });
+  var f = r.finished, h = f ? '<div class="note">' + t('Finished {type} jobs ({n}): budget about {b}, spent about {s}. {o} went over.', { type: typeTxt(r.type), n: f.count, b: money(f.budget), s: money(f.spent), o: f.over }) + '</div>' : '';
+  if (n) h += '<button class="btn" style="width:100%;margin:8px 0" id="bg_fill">' + t('Fill blank steps from past jobs') + '</button>';
+  $('bg_hints').innerHTML = h;
+  if (n) $('bg_fill').onclick = function () {
+    var k = 0;
+    [].forEach.call(document.querySelectorAll('#bg_list input'), function (i) { var x = r.steps[i.getAttribute('data-c')]; if (x && i.value === '') { i.value = x.mid; k++; } });
+    total(); toast(t('Filled {n}. Check them, then Save budget.', { n: k }), 4000);
+  };
+}
+
+// ---------- progress report (PDF) for a client or lender ----------
+function reportSheet(tab) {
+  openSheet(t('Progress report'), function () {
+    return '<div class="sub">' + esc(tab) + '</div><p>' + t('A PDF with progress by phase, what is coming up, and the before and latest photos. It is saved in the project folder (Reports).') + '</p>' +
+      '<label class="tog" style="margin:10px 0 14px"><input type="checkbox" id="rp_money"> ' + t('Include budget and spent (for a lender)') + '</label>' +
+      '<button class="primary" id="rp_go">' + t('Make the PDF') + '</button><div class="hint">' + t('Takes about 20 seconds. Needs signal.') + '</div><div id="rp_out"></div>';
+  });
+  $('rp_go').onclick = function () {
+    var b = this; b.disabled = true; b.textContent = t('Making it…');
+    api('fieldProjectReport', [tab, { money: $('rp_money').checked }], newId()).then(function (r) {
+      b.style.display = 'none';
+      var file = null;
+      if (r.data) { var bin = atob(r.data), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); file = new File([a], r.name, { type: 'application/pdf' }); }
+      var canShare = file && navigator.canShare && navigator.canShare({ files: [file] });
+      $('rp_out').innerHTML = '<div class="note">' + t('Ready: {x}', { x: esc(r.name) }) + '</div>' +
+        (canShare ? '<button class="primary" id="rp_send">' + t('Send it (text, email…)') + '</button>' : '') +
+        '<button class="primary soft" id="rp_open">' + t('Open it') + '</button>';
+      if (canShare) $('rp_send').onclick = function () { navigator.share({ files: [file], title: r.name }).catch(function () {}); };
+      $('rp_open').onclick = function () { window.open(file ? URL.createObjectURL(file) : r.url, '_blank'); };
+    }, function (e) { b.disabled = false; b.textContent = t('Make the PDF'); fail(e); });
   };
 }
 
@@ -1143,6 +1306,7 @@ function openAdd() {
       a('📷', t('Photo of a step'), t('Saved to the project folder'), function (x) { pickStep(x); }, true) +
       a('🧾', t('Material or receipt'), t('Something you bought or ordered'), formMaterial, true) +
       (CREW ? '' :
+        a('🧾', t('One receipt, several items'), t('Split it across items and jobs'), function () { splitReceipt(); }, false) +
         a('💵', t('Payment'), t('Contractor, sub or fee paid'), formPayment, true) +
         a('📄', t('Contract or bid'), t('Photo or PDF of the paperwork'), formContract, true) +
         a('🏠', t('New project'), t('Makes the tab, folder and Dashboard row'), formProject, false));
@@ -1161,7 +1325,7 @@ function pickStep(tab) {
   var open = d.steps.filter(function (s) { return s.status !== 'Complete'; });
   openSheet(t('Photo for which step?'), function () {
     return '<div class="sub">' + esc(tab) + '</div>' + open.map(function (s) {
-      return '<label class="act"><span>' + esc(s.name) + '<small>' + esc(s.phase || '') + (s.status === 'Started' ? ' · ' + t('Started') : '') + '</small></span>' +
+      return '<label class="act"><span>' + esc(nm(s)) + '<small>' + esc(s.phase || '') + (s.status === 'Started' ? ' · ' + t('Started') : '') + '</small></span>' +
         '<input type="file" accept="image/*" style="display:none" ' + on(function (e, el) { photo(tab, s.row, s.n, 'step', el, s.name); }, 'onchange') + '></label>';
     }).join('');
   });

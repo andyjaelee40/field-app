@@ -1,5 +1,5 @@
 // Keeps the app's own files on the phone so it opens with no signal. Calls to Google always go to the network.
-var VERSION = 'pcc-14';
+var VERSION = 'pcc-15';
 var FILES = ['./', 'index.html', 'app.css', 'app.js', 'i18n.js', 'queue.js', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', function (e) {

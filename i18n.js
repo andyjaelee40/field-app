@@ -15,7 +15,7 @@ function t(s, v) {
 // tn(3, 'day') -> "3 days" / "3 días"
 var PL = {
   day: ['day', 'days', 'día', 'días'], item: ['item', 'items', 'artículo', 'artículos'], material: ['material', 'materials', 'material', 'materiales'],
-  project: ['project', 'projects', 'proyecto', 'proyectos'], update: ['update', 'updates', 'cambio', 'cambios'],
+  project: ['project', 'projects', 'proyecto', 'proyectos'], job: ['job', 'jobs', 'obra', 'obras'], update: ['update', 'updates', 'cambio', 'cambios'],
   'basic material': ['basic material', 'basic materials', 'material básico', 'materiales básicos']
 };
 function tn(n, w) { var p = PL[w] || [w, w + 's', w, w + 's'], es = LANG === 'es' ? 2 : 0; return n + ' ' + p[es + (n === 1 ? 0 : 1)]; }
@@ -207,7 +207,23 @@ var ES = {
   'Where materials are kept until they go in. Renaming a place changes it on every job.': 'Donde se guardan los materiales. Cambiar el nombre lo cambia en todas las obras.',
   'Add a store': 'Agregar una tienda', 'Add a place': 'Agregar un lugar', 'None yet.': 'Ninguno todavía.', 'Name': 'Nombre', 'Take off the list': 'Quitar de la lista',
   'Jobs that use it keep it. It just stops showing as a choice.': 'Las obras que lo usan lo conservan. Solo deja de salir como opción.', 'Enter a name.': 'Escribe un nombre.',
-  'Renamed to {x}': 'Nuevo nombre: {x}', '{x} taken off the list': '{x} se quitó de la lista', 'Enter the material name.': 'Escribe el nombre del material.',
+  'Renamed to {x}': 'Nuevo nombre: {x}',
+  'This year so far': 'En lo que va del año', '$600 or more: may need a 1099': '$600 o más: puede necesitar un 1099',
+  'If your phone asks, allow location: it only records how far you are from the job, once, when you check in.': 'Si tu teléfono pregunta, permite la ubicación: solo anota qué tan lejos estás de la obra, una vez, al registrarte.',
+  'One receipt, several items': 'Un recibo, varias cosas', 'Split it across items and jobs': 'Repartirlo entre cosas y obras',
+  'Progress report for a client or lender': 'Informe de avance para cliente o prestamista', 'Past jobs: about {x}': 'Obras anteriores: aprox. {x}',
+  'Finished {type} jobs ({n}): budget about {b}, spent about {s}. {o} went over.': 'Obras terminadas de {type} ({n}): presupuesto aprox. {b}, gastado aprox. {s}. {o} se pasaron.',
+  'Fill blank steps from past jobs': 'Llenar los pasos vacíos con obras anteriores', 'Filled {n}. Check them, then Save budget.': 'Se llenaron {n}. Revísalos y luego guarda el presupuesto.',
+  'Progress report': 'Informe de avance', 'A PDF with progress by phase, what is coming up, and the before and latest photos. It is saved in the project folder (Reports).': 'Un PDF con el avance por fase, lo que sigue y las fotos de antes y las más recientes. Se guarda en la carpeta del proyecto (Reports).',
+  'Include budget and spent (for a lender)': 'Incluir presupuesto y gastos (para el prestamista)', 'Make the PDF': 'Hacer el PDF', 'Making it…': 'Haciéndolo…',
+  'Ready: {x}': 'Listo: {x}', 'Send it (text, email…)': 'Enviarlo (mensaje, correo…)', 'Open it': 'Abrirlo',
+  'Text it': 'Mandar por mensaje', 'All ordered': 'Todo pedido', 'Tap again: {n} ordered': 'Toca otra vez: {n} pedidos', '{n} marked ordered': '{n} marcados como pedidos',
+  'new': 'nuevo', 'Nothing picked yet. Tap the items below that are on this receipt.': 'Nada elegido todavía. Toca abajo las cosas que están en este recibo.',
+  'Adds up to the receipt': 'Cuadra con el recibo', 'Left to split: {x}': 'Falta repartir: {x}', 'Total: {x}': 'Total: {x}', 'On this receipt': 'En este recibo',
+  'Split the rest evenly': 'Repartir el resto por igual', 'Open items on every job': 'Pendientes en todas las obras', 'Something not on any list': 'Algo que no está en ninguna lista',
+  'Project': 'Proyecto', 'Add to this receipt': 'Agregar a este recibo', 'Type the receipt total first, or scan it.': 'Escribe primero el total del recibo, o escanéalo.',
+  'Pick what the receipt was for.': 'Elige para qué fue el recibo.', 'Type an amount for each item (0 is fine).': 'Escribe una cantidad para cada cosa (0 está bien).',
+  'The items add up to {a}, the receipt says {b}.': 'Las cosas suman {a}, el recibo dice {b}.', 'Receipt split across {x}': 'Recibo repartido entre {x}', '{x} taken off the list': '{x} se quitó de la lista', 'Enter the material name.': 'Escribe el nombre del material.',
   // statuses and flags from the sheet
   'Not Started': 'Sin empezar', 'Complete': 'Listo', 'Needed': 'Falta', 'Quoted': 'Cotizado', 'Backordered': 'Pendiente del proveedor', 'Shipped': 'Enviado', 'Delivered': 'Entregado',
   'Returned': 'Devuelto', 'Cancelled': 'Cancelado', 'Idea': 'Idea', 'Pending Approval': 'Por aprobar', 'Approved': 'Aprobado', 'Rejected': 'Rechazado',

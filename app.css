@@ -213,3 +213,13 @@ img.big { display:block; width:100%; border-radius:14px; margin-top:6px; }
 /* tap a material's name to change it */
 .tapedit, .mrow.tap b { display:flex; justify-content:space-between; align-items:baseline; gap:10px; cursor:pointer; }
 .edit { flex:none; font-size:14px; font-weight:600; color:var(--link); letter-spacing:0; }
+/* shopping list: a store's header carries Text it and All ordered */
+.h2.shoph { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+.h2.shoph .linkbtn { font-size:14px; margin-left:12px; padding:0; text-transform:none; letter-spacing:0; }
+/* one receipt, several items */
+.sprow { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); }
+.sprow span { flex:1; min-width:0; } .sprow b { display:block; font-weight:600; } .sprow small { color:var(--muted); font-size:13px; }
+.sprow input { width:96px; flex:none; margin:0; }
+.sprow .x { flex:none; border:0; background:none; color:var(--muted); font-size:22px; padding:4px 6px; }
+/* budget: what past jobs spent on the step */
+.bghint { display:block; color:var(--muted); font-size:12px; font-weight:400; }
