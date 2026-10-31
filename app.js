@@ -250,7 +250,7 @@ function renderWork() {
   }
   if (prac.length) h += '<details class="prac"' + (real.length ? '' : ' open') + '><summary class="h2"><span>Practice: Example Project (' + prac.length + ')</span><span>›</span></summary>' +
     '<div class="hint" style="margin:0 4px 10px">Safe to tap anything here. It is a practice project.</div>' + prac.map(workCard).join('') + '</details>';
-  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button><div class="hint">App version 10</div></div>';
+  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button><div class="hint">App version 11</div></div>';
   return h;
 }
 function workCard(x) {
@@ -364,7 +364,8 @@ function stepRow(tab, s) {
 var ON_WAY = ['Ordered', 'Backordered', 'Shipped'];
 function matGroup(x) { return x.done || x.status === 'Delivered' || x.status === 'Installed' ? (x.status === 'Returned' ? '' : 'have') : ON_WAY.indexOf(x.status) > -1 ? 'way' : x.status === 'Cancelled' ? '' : 'need'; }
 function projType(tab) { var p = HOME && HOME.projects.filter(function (x) { return x.tab === tab; })[0]; return p ? p.type : ''; }
-function standardFor(type) { return (CATALOG || []).filter(function (m) { return m.steps && m.steps[type]; }); }
+function forType(type) { return (CATALOG || []).filter(function (m) { return m.steps && m.steps[type]; }); }
+function standardFor(type) { return forType(type).filter(function (m) { return m.core !== false; }); }
 function renderDeliveries(tab, d) {
   var all = d.deliveries || [], type = projType(tab), std = standardFor(type);
   var have = {}; all.forEach(function (x) { have[x.name.trim().toLowerCase()] = 1; });
@@ -398,12 +399,14 @@ function orderedTap(tab, x) { save('fieldOrdered', [tab, x.row, { n: x.n }], 'Or
 
 // Pick from the Materials List tab: the standard items for this project type first, everything else one tap away
 function pickMaterials(tab) {
-  var type = projType(tab), std = standardFor(type), sel = {}, mode = std.length ? 'std' : 'all', q = '';
+  var type = projType(tab), std = standardFor(type), all = forType(type), sel = {}, mode = std.length ? 'std' : 'all', q = '';
+  if (!all.length) all = CATALOG;
   var have = {}; ((PROJ[tab] && PROJ[tab].deliveries) || []).forEach(function (x) { have[x.name.trim().toLowerCase()] = 1; });
   if (!(CATALOG || []).length) { toast('The Materials List is empty. Add items on the Materials List tab in the sheet.', 5000); return; }
   var count = function () { return Object.keys(sel).length; };
   var body = function () {
-    var list = (mode === 'std' ? std : CATALOG).filter(function (m) { return !q || m.item.toLowerCase().indexOf(q) > -1 || m.cat.toLowerCase().indexOf(q) > -1; });
+    // searching looks through the whole Materials List, not just this project type
+    var list = (q ? CATALOG : mode === 'std' ? std : all).filter(function (m) { return !q || m.item.toLowerCase().indexOf(q) > -1 || m.cat.toLowerCase().indexOf(q) > -1; });
     if (!list.length) return '<div class="empty">Nothing matches.</div>';
     var cats = [], by = {};
     list.forEach(function (m) { var c = m.cat || 'Other'; if (!by[c]) { by[c] = []; cats.push(c); } by[c].push(m); });
@@ -419,8 +422,8 @@ function pickMaterials(tab) {
   var redraw = function () { $('pk_list').innerHTML = body(); var b = $('pk_go'); b.disabled = !count(); b.textContent = count() ? 'Add ' + plural(count(), 'material') : 'Pick materials'; };
   openSheet('Add materials', function () {
     return '<div class="sub">' + esc(tab) + (type ? ' · ' + esc(type) : '') + '</div>' +
-      (std.length ? '<div class="who" style="margin:10px 0"><button class="on" id="pk_std">Standard for this job</button><button id="pk_all">All materials</button></div>' : '') +
-      '<input id="pk_q" placeholder="Search materials" autocomplete="off">' +
+      (std.length ? '<div class="who" style="margin:10px 0"><button class="on" id="pk_std">Standard (' + std.length + ')</button><button id="pk_all">All for this job (' + all.length + ')</button></div>' : '') +
+      '<input id="pk_q" placeholder="Search all materials" autocomplete="off">' +
       '<div id="pk_list">' + body() + '</div>' +
       '<div class="pkbar"><button class="primary" id="pk_go" disabled>Pick materials</button></div>';
   });
@@ -457,8 +460,9 @@ function loadStandard(tab) {
   var list = standardFor(type).filter(function (m) { return !have[m.item.toLowerCase()]; });
   openSheet('Load the standard list?', function () {
     return '<div class="sub">' + esc(tab) + ' · ' + esc(type) + '</div>' +
-      '<p>Adds <b>' + plural(list.length, 'material') + '</b> from the standard ' + esc(type) + ' list as <b>Still need</b>, each linked to its step. Anything already on this job is skipped.</p>' +
-      '<div class="hint">Change the standard list on the Materials List tab in the sheet. Remove what a job doesn’t need on its tab.</div>' +
+      '<p>Adds the <b>' + plural(list.length, 'basic material') + '</b> nearly every ' + esc(type) + ' job uses, as <b>Still need</b>, each linked to its step. Anything already on this job is skipped.</p>' +
+      '<div class="mrow" style="border:1px solid var(--line);border-radius:14px;margin:10px 0">' + list.map(function (m) { return esc(m.item); }).join(' · ') + '</div>' +
+      '<div class="hint">Job-specific items (cabinets, roofing, windows…) are under <b>+ Add from list</b>, then All. Change what counts as standard in the sheet: Materials List tab, Standard column.</div>' +
       '<button class="primary" id="ls_go" ' + on(function (e, el) { addMaterials(tab, list.map(function (m) { return matItem(m, type, 1); }), el); }) + '>Add ' + plural(list.length, 'material') + '</button>' +
       '<button class="primary soft" onclick="closeSheet()">Not now</button>';
   });
