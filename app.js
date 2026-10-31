@@ -212,7 +212,7 @@ function go(name, tab) {
   VIEW = { name: name, tab: tab };
   if (name === 'project') { PTAB = 'steps'; if (!RAW[tab]) { var c = cacheGet('pcc_p_' + tab); if (c) { RAW[tab] = c; } } rebuild(); loadProject(tab); }
   else render();
-  $('view').scrollTop = 0;
+  $('scroll').scrollTop = 0;
 }
 function head(title, sub, back) {
   $('head').innerHTML = (back ? '<button class="back" onclick="go(\'projects\')">‹ All projects</button>' : '') +
@@ -249,7 +249,7 @@ function renderWork() {
   }
   if (prac.length) h += '<details class="prac"' + (real.length ? '' : ' open') + '><summary class="h2"><span>Practice: Example Project (' + prac.length + ')</span><span>›</span></summary>' +
     '<div class="hint" style="margin:0 4px 10px">Safe to tap anything here. It is a practice project.</div>' + prac.map(workCard).join('') + '</details>';
-  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button><div class="hint">App version 6</div></div>';
+  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button><div class="hint">App version 7</div></div>';
   return h;
 }
 function workCard(x) {

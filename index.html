@@ -3,40 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1F2A44">
+<meta name="theme-color" content="#F5F1EA">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Field App">
 <title>Field App</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
-<link rel="stylesheet" href="app.css?v=6">
+<link rel="stylesheet" href="app.css?v=7">
 </head>
 <body>
 <div id="app">
+<div id="scroll">
 <header>
   <div id="head"></div>
   <button id="sync" onclick="syncTap()"></button>
 </header>
 <div id="install"></div>
 <main id="view"><div class="spin">Loading…</div></main>
+</div>
 <nav>
   <button id="n-work" onclick="go('work')"><svg viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></svg>My Work</button>
   <button id="n-add" onclick="openAdd()"><span class="plus">+</span>Add</button>
   <button id="n-projects" onclick="go('projects')"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 9.5V20h14V9.5"/></svg>Projects</button>
 </nav>
 </div>
-<!-- iPhone Safari colors the strip under the clock and the area under its own toolbar from pinned bars at the screen edges -->
-<div id="tintTop"></div><div id="tintBottom"></div>
+<!-- iPhone Safari colors the area under its own toolbar from a pinned bar at the bottom edge -->
+<div id="tintBottom"></div>
 <div class="sheet" id="sheet" onclick="if(event.target===this)closeSheet()">
   <div class="sheet-card"><div class="sheet-head"><b id="sheetTitle"></b><button class="x" onclick="closeSheet()" aria-label="Close">✕</button></div><div id="sheetBody"></div></div>
 </div>
 <div id="gate" class="cover"></div>
 <div id="welcome" class="cover"></div>
 <div id="toast"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
-<script src="queue.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="queue.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
