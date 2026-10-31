@@ -157,7 +157,7 @@ function effectHome(it) {
   if (!HOME || typeof tab !== 'string') return;
   var hits = function (kind) { return HOME.items.filter(function (x) { return x.project === tab && x.kind === kind && lineMatch(x, row, p.n); }); };
   if (it.fn === 'fieldUpdateStep' && p.status) hits('step').forEach(function (x) { x.status = p.status; x.done = p.status === 'Complete'; });
-  if (it.fn === 'fieldReceive' || it.fn === 'fieldOrdered') hits('inv').forEach(function (x) { x.done = true; });
+  if (it.fn === 'fieldReceive' || it.fn === 'fieldOrdered' || (it.fn === 'fieldEditMaterial' && p.remove)) hits('inv').forEach(function (x) { x.done = true; });
   if (it.fn === 'fieldDecide' && LOCKED.indexOf(p.status) > -1) hits('des').forEach(function (x) { x.done = true; });
   if (it.fn === 'fieldPaymentUpdate' && p.lien) hits('pay').forEach(function (x) { x.done = true; });
 }
@@ -173,6 +173,7 @@ function effectProj(it) {
   });
   if (it.fn === 'fieldReceive') hit(d.deliveries).forEach(function (x) { x.status = 'Delivered'; x.done = true; x.flag = ''; if (p.storedAt) x.stored = p.storedAt; x.got = t('today'); });
   if (it.fn === 'fieldOrdered') hit(d.deliveries).forEach(function (x) { x.status = 'Ordered'; x.flag = ''; });
+  if (it.fn === 'fieldEditMaterial') { if (p.remove) d.deliveries = keep(d.deliveries); else hit(d.deliveries).forEach(function (x) { editLocal(x, p); }); }
   if (it.fn === 'fieldDecide') { hit(d.decisions).forEach(function (x) { x.status = p.status; }); if (LOCKED.indexOf(p.status) > -1) d.decisions = keep(d.decisions); }
   if (it.fn === 'fieldPaymentUpdate' && p.lien) hit(d.payments).forEach(function (x) { x.lien = p.lien; x.flag = 'OK'; });
 }
@@ -183,8 +184,9 @@ function effectLabor(it) {
   HOME.myDay = (others + p.days > 1 ? [] : mine).concat([{ project: p.project, days: p.days }]);
 }
 function effectShop(it) {
-  if (!SHOP || (it.fn !== 'fieldReceive' && it.fn !== 'fieldOrdered')) return;
+  if (!SHOP || (it.fn !== 'fieldReceive' && it.fn !== 'fieldOrdered' && it.fn !== 'fieldEditMaterial')) return;
   var a = it.args, p = a[2] || {};
+  if (it.fn === 'fieldEditMaterial' && !p.remove) { SHOP.forEach(function (x) { if (x.project === a[0] && lineMatch(x, a[1], p.n)) editLocal(x, p); }); return; }
   SHOP = SHOP.filter(function (x) { return !(x.project === a[0] && lineMatch(x, a[1], p.n)); });
 }
 function rebuild() {
@@ -312,7 +314,7 @@ function renderWork() {
   }
   if (prac.length) h += '<details class="prac"' + (real.length ? '' : ' open') + '><summary class="h2"><span>' + t('Practice: Example Project') + ' (' + prac.length + ')</span><span>›</span></summary>' +
     '<div class="hint" style="margin:0 4px 10px">' + t('Safe to tap anything here. It is a practice project.') + '</div>' + prac.map(workCard).join('') + '</details>';
-  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">' + t('Refresh') + '</button><div class="hint">' + t('App version') + ' 13</div></div>';
+  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">' + t('Refresh') + '</button><div class="hint">' + t('App version') + ' 14</div></div>';
   return h;
 }
 function workCard(x) {
@@ -359,7 +361,8 @@ function bought(x) {
   openSheet(t('Bought: {x}', { x: x.name }), function () {
     return '<div class="sub">' + esc(x.project) + (x.qty && x.qty !== 1 ? ' · ' + t('qty') + ' ' + esc(x.qty) : '') + (x.vendor ? ' · ' + esc(x.vendor) : '') + '</div>' + priceBlock('by') +
       '<button class="primary" id="by_go">' + t('Save') + '</button>' +
-      '<button class="primary soft" id="by_skip">' + t('Bought, no price yet') + '</button>';
+      '<button class="primary soft" id="by_skip">' + t('Bought, no price yet') + '</button>' +
+      (CREW ? '' : '<button class="linkbtn" style="margin-top:10px" ' + on(function () { editMaterial(x.project, x); }) + '>' + t('Change the name, store or qty') + '</button>');
   });
   priceWire('by');
   var done = function (withPrice) {
@@ -615,8 +618,8 @@ function renderDeliveries(tab, d) {
   var card = function (x, k) {
     var meta = [x.vendor, x.qty && x.qty !== 1 ? t('qty') + ' ' + x.qty : '', x.step ? t('step') + ' ' + x.step : '', k === 'way' && x.eta ? t('arrives') + ' ' + dayTxt(x.eta) : '', k === 'need' && x.needed ? t('needed') + ' ' + dayTxt(x.needed) : '']
       .filter(Boolean).map(esc).join(' · ');
-    if (k === 'have') return '<div class="mrow"><b>' + esc(x.name) + '</b><small>' + (x.status === 'Installed' ? t('Installed') : t('In hand')) + (x.stored ? ' · ' + esc(x.stored) : '') + (x.got ? ' · ' + esc(dayTxt(x.got)) : '') + '</small></div>';
-    return '<div class="card"><div class="title" style="margin-top:0">' + esc(x.name) + '</div><div class="why">' + (meta || esc(t(x.status || 'Needed'))) + (k === 'way' && x.status !== 'Ordered' ? ' · ' + esc(t(x.status)) : '') + '</div>' + flagHtml(x.flag) +
+    if (k === 'have') return '<div class="mrow tap" ' + on(function () { editMaterial(tab, x); }) + '><b>' + esc(x.name) + '<span class="edit">' + t('Edit') + '</span></b><small>' + (x.status === 'Installed' ? t('Installed') : t('In hand')) + (x.stored ? ' · ' + esc(x.stored) : '') + (x.got ? ' · ' + esc(dayTxt(x.got)) : '') + '</small></div>';
+    return '<div class="card"><div class="title tapedit" style="margin-top:0" ' + on(function () { editMaterial(tab, x); }) + '>' + esc(x.name) + '<span class="edit">' + t('Edit') + '</span></div><div class="why">' + (meta || esc(t(x.status || 'Needed'))) + (k === 'way' && x.status !== 'Ordered' ? ' · ' + esc(t(x.status)) : '') + '</div>' + flagHtml(x.flag) +
       (k === 'need'
         ? '<div class="row"><button class="go soft" style="margin:0" ' + on(function () { orderedTap(tab, x); }) + '>' + t('Ordered') + '</button><button class="go" style="margin:0" ' + on(function () { receiveSheet(tab, x.row, x.n, x.name); }) + '>' + t('Got it') + '</button></div>'
         : '<button class="go" ' + on(function () { receiveSheet(tab, x.row, x.n, x.name); }) + '>' + t('I got it') + '</button>') + '</div>';
@@ -627,7 +630,8 @@ function renderDeliveries(tab, d) {
   if (!g.need.length && !g.way.length) h += '<div class="empty"><div class="big">✓</div><b>' + t('Everything is in hand') + '</b></div>';
   if (g.have.length) h += '<details class="prac"><summary class="h2"><span>' + t('In hand') + ' (' + g.have.length + ')</span><span>›</span></summary><div class="mlist">' + g.have.map(function (x) { return card(x, 'have'); }).join('') + '</div></details>';
   if (!CREW && missing.length) h += '<div style="text-align:center;margin-top:14px"><button class="linkbtn" ' + on(function () { loadStandard(tab); }) + '>' + t('Add the rest of the standard list ({n})', { n: missing.length }) + '</button></div>';
-  if (!CREW) h += '<div style="text-align:center;margin-top:6px"><button class="linkbtn" ' + on(function () { catalogSheet(); }) + '>' + t('Edit the materials list') + '</button></div>';
+  if (!CREW) h += '<div style="text-align:center;margin-top:6px"><button class="linkbtn" ' + on(function () { catalogSheet(); }) + '>' + t('Edit the materials list') + '</button><br>' +
+    '<button class="linkbtn" ' + on(function () { listsSheet(0); }) + '>' + t('Edit store and storage place names') + '</button></div>';
   return h;
 }
 function orderedTap(tab, x) { save('fieldOrdered', [tab, x.row, { n: x.n }], t('Ordered') + ' · ' + x.name, t('{x}: ordered', { x: x.name })); }
@@ -721,7 +725,8 @@ function catalogSheet() {
     return '<div class="sub">' + t('What the app offers on every job. Tap one to change it, or which project types start with it.') + '</div>' +
       '<button class="primary" onclick="catalogItem(-1)">+ ' + t('New material') + '</button>' +
       '<input id="cl_q" style="margin-top:12px" placeholder="' + esc(t('Search all materials')) + '" autocomplete="off">' +
-      '<div id="cl_list">' + body() + '</div>';
+      '<div id="cl_list">' + body() + '</div>' +
+      '<div style="text-align:center;margin-top:10px"><button class="linkbtn" onclick="listsSheet(1)">' + t('Edit store and storage place names') + '</button></div>';
   });
   $('cl_q').oninput = function () { q = this.value.trim().toLowerCase(); $('cl_list').innerHTML = body(); };
   $('cl_list').onclick = function (e) { var r = e.target.closest('.pick'); if (r) catalogItem(Number(r.getAttribute('data-i'))); };
@@ -768,6 +773,96 @@ function removeCatalogItem(m) {
   api('fieldCatalogRemove', [m.item], newId()).then(function (list) {
     setCatalog(list); toast(t('{x} removed from the list. Jobs that have it keep it.', { x: m.item }), 4000); catalogSheet();
   }, function (e) { b.disabled = false; fail(e); });
+}
+// ---------- Change one material on a job: name, store, qty, step, where it is kept (crew: only where it is kept) ----------
+function editLocal(x, p) {
+  if (p.name !== undefined) x.name = p.name;
+  if (p.vendor !== undefined) x.vendor = p.vendor;
+  if (p.qty !== undefined) x.qty = Number(p.qty) > 0 ? Number(p.qty) : 1;
+  if (p.step !== undefined) x.step = p.step;
+  if (p.stored !== undefined) x.stored = p.stored;
+}
+function editMaterial(tab, x) {
+  var d = PROJ[tab] || {}, places = (d.storedAt && d.storedAt.length ? d.storedAt : LISTS.stored) || [], where = x.stored || '';
+  var steps = (d.steps || []).filter(function (s) { return s.code; });
+  if (x.stored && places.indexOf(x.stored) < 0) places = places.concat([x.stored]);
+  openSheet(CREW ? x.name : t('Change {x}', { x: x.name }), function () {
+    return (CREW ? '' :
+      field(t('Material'), '<input id="em_name" value="' + esc(x.name) + '">') +
+      '<div class="two"><div>' + field(t('Where from?'), '<input id="em_vendor" list="em_vendors" value="' + esc(x.vendor || '') + '"><datalist id="em_vendors">' + opts(LISTS.vendors) + '</datalist>') + '</div><div>' +
+      field(t('Qty'), '<input id="em_qty" type="number" inputmode="decimal" min="0" value="' + esc(x.qty || 1) + '">') + '</div></div>' +
+      field(t('For step #'), steps.length
+        ? '<select id="em_step"><option value=""></option>' + steps.map(function (s) { return '<option value="' + esc(s.code) + '"' + (same(s.code, x.step) ? ' selected' : '') + '>' + esc(s.code + ' ' + s.name) + '</option>'; }).join('') +
+          (x.step && !steps.some(function (s) { return same(s.code, x.step); }) ? '<option selected value="' + esc(x.step) + '">' + esc(x.step) + '</option>' : '') + '</select>'
+        : '<input id="em_step" type="number" inputmode="numeric" value="' + esc(x.step || '') + '">')) +
+      '<div class="sec">' + t('Where is it now?') + '</div><div class="chips" id="em_places">' + places.map(function (w) {
+        return '<button class="chip' + (w === where ? ' on' : '') + '" ' + on(function (e, el) { where = w; $('em_where').value = ''; pickOne(el); }) + '>' + esc(w) + '</button>';
+      }).join('') + '</div>' +
+      field(t('Somewhere else'), '<input id="em_where" placeholder="' + esc(t('Garage, site trailer, unit 2…')) + '">') +
+      '<button class="primary" id="em_go">' + t('Save') + '</button>' +
+      (CREW ? '' : '<button class="primary soft danger-text" id="em_rm">' + t('Remove from this job') + '</button>' +
+        '<button class="linkbtn" style="margin-top:10px" ' + on(function () { listsSheet(0); }) + '>' + t('Edit store and storage place names') + '</button>');
+  });
+  $('em_where').oninput = function () { if (this.value.trim()) { where = this.value.trim(); [].forEach.call($('em_places').children, function (b) { b.className = 'chip'; }); } };
+  $('em_go').onclick = function () {
+    var p = { n: x.n }, ch = function (k, v, old) { if (String(v) !== String(old === undefined ? '' : old)) p[k] = v; };
+    if (!CREW) {
+      var name = $('em_name').value.trim();
+      if (!need(name, t('Enter the material name.'))) return;
+      ch('name', name, x.name); ch('vendor', $('em_vendor').value.trim(), x.vendor);
+      ch('qty', Number($('em_qty').value) > 0 ? Number($('em_qty').value) : 1, x.qty || 1); ch('step', $('em_step').value, x.step);
+    }
+    ch('stored', where, x.stored);
+    closeSheet();
+    if (Object.keys(p).length < 2) return;
+    save('fieldEditMaterial', [tab, x.row, p], t('Change') + ' · ' + (p.name || x.name), t('{x} saved', { x: p.name || x.name }));
+  };
+  if ($('em_rm')) $('em_rm').onclick = function () {
+    if (this.getAttribute('data-sure') !== '1') { this.setAttribute('data-sure', '1'); this.textContent = t('Tap again to remove {x}', { x: x.name }); return; }
+    closeSheet(); save('fieldEditMaterial', [tab, x.row, { n: x.n, remove: true }], t('Remove') + ' · ' + x.name, t('{x} removed from this job', { x: x.name }));
+  };
+}
+
+// ---------- Storage places and stores: rename, add, remove (owners and PMs, needs signal) ----------
+var LIST_KINDS = [['Stored At', 'stored', 'Storage places'], ['Vendors', 'vendors', 'Stores']];
+function listsSheet(k) {
+  var L = LIST_KINDS[k], list = LISTS[L[1]] || [];
+  openSheet(t('Stores and storage places'), function () {
+    return '<div class="seg">' + LIST_KINDS.map(function (x, i) { return '<button class="' + (i === k ? 'on' : '') + '" onclick="listsSheet(' + i + ')">' + t(x[2]) + '</button>'; }).join('') + '</div>' +
+      '<div class="sub">' + (k ? t('Where you buy materials. Renaming a store changes it on every job and on the Materials List.') : t('Where materials are kept until they go in. Renaming a place changes it on every job.')) + '</div>' +
+      '<button class="primary" onclick="listItem(' + k + ',-1)">+ ' + (k ? t('Add a store') : t('Add a place')) + '</button>' +
+      (list.length ? '<div class="mlist" style="margin-top:12px">' + list.map(function (v, i) {
+        return '<div class="pick" onclick="listItem(' + k + ',' + i + ')"><span class="pt"><b>' + esc(v) + '</b></span><span class="chev">›</span></div>';
+      }).join('') + '</div>' : '<div class="empty">' + t('None yet.') + '</div>');
+  });
+}
+function listItem(k, i) {
+  var L = LIST_KINDS[k], was = i > -1 ? (LISTS[L[1]] || [])[i] : '';
+  openSheet(was || (k ? t('Add a store') : t('Add a place')), function () {
+    return field(t('Name'), '<input id="li_name" value="' + esc(was) + '">') +
+      '<button class="primary" id="li_go">' + t('Save') + '</button>' +
+      (was ? '<button class="primary soft danger-text" id="li_rm">' + t('Take off the list') + '</button><div class="hint">' + t('Jobs that use it keep it. It just stops showing as a choice.') + '</div>' : '') +
+      '<button class="linkbtn" style="margin-top:10px" onclick="listsSheet(' + k + ')">‹ ' + t('Back to the list') + '</button>';
+  });
+  var send = function (p, b, msg) {
+    b.disabled = true; b.textContent = t('Saving…');
+    api('fieldListSave', [p], newId()).then(function (list) {
+      LISTS[L[1]] = list; if (HOME_RAW) { HOME_RAW.lists = LISTS; cachePut('pcc_home', HOME_RAW); }
+      Object.keys(RAW).forEach(function (tab) { if (k === 0) RAW[tab].storedAt = list; });
+      toast(msg); listsSheet(k);
+      if (p.was && p.name && p.name !== p.was) refresh();   // renamed on every job: reload what's on screen
+    }, function (e) { b.disabled = false; b.textContent = t('Save'); fail(e); });
+  };
+  $('li_go').onclick = function () {
+    var name = $('li_name').value.trim();
+    if (!need(name, t('Enter a name.'))) return;
+    if (name === was) { listsSheet(k); return; }
+    send({ list: L[0], was: was, name: name }, this, was ? t('Renamed to {x}', { x: name }) : t('{x} saved', { x: name }));
+  };
+  if ($('li_rm')) $('li_rm').onclick = function () {
+    if (this.getAttribute('data-sure') !== '1') { this.setAttribute('data-sure', '1'); this.textContent = t('Tap again to remove {x}', { x: was }); return; }
+    send({ list: L[0], was: was, remove: true }, this, t('{x} taken off the list', { x: was }));
+  };
 }
 function setCatalog(list) { CATALOG = list || []; if (HOME_RAW) { HOME_RAW.catalog = CATALOG; cachePut('pcc_home', HOME_RAW); } rebuild(); }
 

@@ -121,7 +121,7 @@ var ES = {
   'New material': 'Material nuevo', 'Material': 'Material', '2x4 studs, tile, vanity…': 'Montantes 2x4, azulejo, mueble de baño…', 'Category': 'Categoría', 'Usual store': 'Tienda de siempre',
   'Unit': 'Unidad', 'each, sq ft, gallon…': 'pieza, pie², galón…', 'Unit cost ($)': 'Costo por unidad ($)', 'Which jobs use it?': '¿Qué obras lo usan?',
   'Pick the step it is for on each project type. Turn on Standard to load it onto every new job of that type.': 'Elige el paso para cada tipo de proyecto. Activa Estándar para cargarlo en cada obra nueva de ese tipo.',
-  'Not used': 'No se usa', 'Save': 'Guardar', 'Remove from the list': 'Quitar de la lista', 'Back to the list': 'Volver a la lista', 'Enter the material name.': 'Escribe el nombre del material.',
+  'Not used': 'No se usa', 'Save': 'Guardar', 'Remove from the list': 'Quitar de la lista', 'Back to the list': 'Volver a la lista',
   'To make it standard for a project type, pick its step there too.': 'Para hacerlo estándar en un tipo de proyecto, elige también su paso.', '{x} saved': '{x} guardado',
   'Tap again to remove {x}': 'Toca otra vez para quitar {x}', 'Removing…': 'Quitando…', '{x} removed from the list. Jobs that have it keep it.': '{x} se quitó de la lista. Las obras que lo tienen lo conservan.',
   // photos
@@ -200,6 +200,14 @@ var ES = {
   'What did it cost? ($)': '¿Cuánto costó? ($)', 'Receipt and price (optional)': 'Recibo y precio (opcional)', 'For something already on this job?': '¿Es para algo que ya está en esta obra?',
   'No, a new item': 'No, es algo nuevo', 'Mark received with this receipt': 'Marcar recibido con este recibo', 'That day is already paid. Ask Andy or a project manager to change it.': 'Ese día ya está pagado. Pídele a Andy o a un encargado que lo cambie.',
   'Pick someone from the Team tab.': 'Elige a alguien del equipo.',
+  'Edit': 'Cambiar', 'Change {x}': 'Cambiar {x}', 'Change': 'Cambio', 'Remove': 'Quitar', 'Somewhere else': 'En otro lugar', 'Garage, site trailer, unit 2…': 'Garaje, tráiler de obra, unidad 2…',
+  'Remove from this job': 'Quitar de esta obra', '{x} removed from this job': '{x} se quitó de esta obra', 'Edit store and storage place names': 'Cambiar nombres de tiendas y lugares',
+  'Change the name, store or qty': 'Cambiar nombre, tienda o cantidad', 'Stores and storage places': 'Tiendas y lugares', 'Storage places': 'Lugares', 'Stores': 'Tiendas',
+  'Where you buy materials. Renaming a store changes it on every job and on the Materials List.': 'Donde se compran los materiales. Cambiar el nombre lo cambia en todas las obras.',
+  'Where materials are kept until they go in. Renaming a place changes it on every job.': 'Donde se guardan los materiales. Cambiar el nombre lo cambia en todas las obras.',
+  'Add a store': 'Agregar una tienda', 'Add a place': 'Agregar un lugar', 'None yet.': 'Ninguno todavía.', 'Name': 'Nombre', 'Take off the list': 'Quitar de la lista',
+  'Jobs that use it keep it. It just stops showing as a choice.': 'Las obras que lo usan lo conservan. Solo deja de salir como opción.', 'Enter a name.': 'Escribe un nombre.',
+  'Renamed to {x}': 'Nuevo nombre: {x}', '{x} taken off the list': '{x} se quitó de la lista', 'Enter the material name.': 'Escribe el nombre del material.',
   // statuses and flags from the sheet
   'Not Started': 'Sin empezar', 'Complete': 'Listo', 'Needed': 'Falta', 'Quoted': 'Cotizado', 'Backordered': 'Pendiente del proveedor', 'Shipped': 'Enviado', 'Delivered': 'Entregado',
   'Returned': 'Devuelto', 'Cancelled': 'Cancelado', 'Idea': 'Idea', 'Pending Approval': 'Por aprobar', 'Approved': 'Aprobado', 'Rejected': 'Rechazado',

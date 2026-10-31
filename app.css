@@ -210,3 +210,6 @@ img.big { display:block; width:100%; border-radius:14px; margin-top:6px; }
 .mrow.pay b { display:flex; justify-content:space-between; gap:10px; } .mrow.pay b span { font-weight:600; }
 .amt1 { font-weight:600; flex:0 0 auto; }
 .bgrow.lab { border-bottom:2px solid var(--line); }
+/* tap a material's name to change it */
+.tapedit, .mrow.tap b { display:flex; justify-content:space-between; align-items:baseline; gap:10px; cursor:pointer; }
+.edit { flex:none; font-size:14px; font-weight:600; color:var(--link); letter-spacing:0; }
