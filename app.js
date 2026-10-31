@@ -249,7 +249,7 @@ function renderWork() {
   }
   if (prac.length) h += '<details class="prac"' + (real.length ? '' : ' open') + '><summary class="h2"><span>Practice: Example Project (' + prac.length + ')</span><span>›</span></summary>' +
     '<div class="hint" style="margin:0 4px 10px">Safe to tap anything here. It is a practice project.</div>' + prac.map(workCard).join('') + '</details>';
-  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button><div class="hint">App version 7</div></div>';
+  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button><div class="hint">App version 8</div></div>';
   return h;
 }
 function workCard(x) {
@@ -275,11 +275,15 @@ function renderProjects() {
   if (!HOME) return '<div class="spin">Loading…</div>';
   var late = {}; HOME.items.forEach(function (x) { if (!x.done && x.rank === 0) late[x.project] = (late[x.project] || 0) + 1; });
   var list = HOME.projects.slice().sort(function (a, b) { return (a.practice ? 1 : 0) - (b.practice ? 1 : 0); });
-  if (!list.length) return '<div class="empty"><b>No projects yet</b>Tap <b>+ Add</b> to start one.</div>';
+  var arch = HOME.archived || [];
+  var archived = arch.length ? '<details class="prac"><summary class="h2"><span>Archived (' + arch.length + ')</span><span>›</span></summary>' +
+    arch.map(function (a) { return '<div class="arow"><b>' + esc(a.tab) + '</b><small>Archived ' + esc(a.closed) + '</small></div>'; }).join('') +
+    '<div class="hint" style="margin:4px 4px 0">Full copies are in the Project Command Center Archive file. Final numbers are on the Results tab.</div></details>' : '';
+  if (!list.length) return '<div class="empty"><b>No projects yet</b>Tap <b>+ Add</b> to start one.</div>' + archived;
   return list.map(function (p) {
     return '<button class="plist" ' + on(function () { go('project', p.tab); }) + '><span class="pi' + (p.practice ? ' prac' : '') + '">' + HOUSE + '</span><span class="pt">' + esc(p.tab) +
       '<small>' + (p.practice ? 'Practice project · ' : '') + esc(p.type || '') + (late[p.tab] ? ' · <span class="late">' + late[p.tab] + ' late</span>' : '') + '</small></span><span class="chev">›</span></button>';
-  }).join('');
+  }).join('') + archived;
 }
 
 function flagClass(f) {
@@ -297,10 +301,38 @@ function renderProject(tab) {
     return '<button class="' + (PTAB === t[0] ? 'on' : '') + '" ' + on(function () { PTAB = t[0]; render(); }) + '>' + t[1] + '</button>';
   }).join('') + '</div>';
   if (!d) return seg + '<div class="spin">' + (OFFLINE ? 'No signal, and this project has not been opened on this phone yet.' : 'Loading…') + '</div>';
-  if (PTAB === 'steps') return seg + renderSteps(tab, d);
-  if (PTAB === 'deliveries') return seg + renderDeliveries(tab, d);
-  if (PTAB === 'decisions') return seg + renderDecisions(tab, d);
-  return seg + renderMoney(tab, d);
+  var body = PTAB === 'steps' ? renderSteps(tab, d) : PTAB === 'deliveries' ? renderDeliveries(tab, d) : PTAB === 'decisions' ? renderDecisions(tab, d) : renderMoney(tab, d);
+  var arch = HOME && HOME.canArchive && !isPractice(tab)
+    ? '<div class="archrow"><button class="linkbtn danger" ' + on(function () { archiveSheet(tab); }) + '>Archive this project</button></div>' : '';
+  return seg + body + arch;
+}
+function isPractice(tab) { return HOME && HOME.projects.some(function (p) { return p.tab === tab && p.practice; }); }
+
+// ---------- archive (owners and project managers) ----------
+function archiveSheet(tab) {
+  openSheet('Archive ' + tab + '?', function () {
+    return '<div class="sub">Use this when the job is finished or cancelled.</div>' +
+      '<ul class="ticks"><li>It comes off everyone’s phone, the Dashboard, This Week and the 7am email.</li>' +
+      '<li>A full copy is saved in the <b>Project Command Center Archive</b> file, and its final numbers go on the <b>Results</b> tab.</li>' +
+      '<li>The Drive folder, photos and receipts stay where they are.</li></ul>' +
+      '<div class="note">You can’t undo this from the phone. Andy can still open the archived copy in Google Sheets.</div>' +
+      '<button class="primary danger" id="ar_go" ' + on(function () { doArchive(tab); }) + '>Archive project</button>' +
+      '<button class="primary soft" onclick="closeSheet()">Keep it</button><div class="hint">Takes about 20 seconds. Needs signal.</div>';
+  });
+}
+function doArchive(tab) {
+  if (QUEUE.some(function (it) { return it.args && it.args[0] === tab; })) { toast('Wait for this project’s saves to finish first.', 4000); return; }
+  var b = $('ar_go'); b.disabled = true; b.textContent = 'Archiving… about 20 seconds';
+  api('fieldArchiveProject', [tab], newId()).then(function () {
+    delete RAW[tab]; delete RAW_AT[tab]; try { localStorage.removeItem('pcc_p_' + tab); } catch (e) {}
+    if (HOME_RAW) {
+      HOME_RAW.projects = HOME_RAW.projects.filter(function (p) { return p.tab !== tab; });
+      HOME_RAW.items = HOME_RAW.items.filter(function (x) { return x.project !== tab; });
+      HOME_RAW.archived = [{ tab: tab, closed: 'today' }].concat(HOME_RAW.archived || []);
+      cachePut('pcc_home', HOME_RAW);
+    }
+    closeSheet(); go('projects'); toast('"' + tab + '" is archived', 4000); refresh();
+  }, function (e) { b.disabled = false; b.textContent = 'Archive project'; fail(e); });
 }
 function renderSteps(tab, d) {
   var h = '<div class="bar"><label><input type="checkbox" ' + (ONLY_MINE ? 'checked ' : '') + on(function (e, el) { ONLY_MINE = el.checked; render(); }, 'onchange') + '> Only mine</label>' +
