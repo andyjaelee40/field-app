@@ -4,7 +4,7 @@
 // rebuild() redoes that sum, so the screen never jumps back while a save is on its way.
 
 var HOME_RAW = null, HOME = null, HOME_AT = 0, RAW = {}, RAW_AT = {}, PROJ = {};
-var ME = '', TEAM = [], LISTS = {}, WHO = 'mine';
+var ME = '', TEAM = [], LISTS = {}, CATALOG = [], WHO = 'mine';
 var VIEW = { name: 'work' }, PTAB = 'steps', ONLY_MINE = false, SHOW_DONE = false;
 var QUEUE = [], SENT = [], SENDING = false, OFFLINE = false, DIRTY = false, LASTOK = 0;
 var UNDO_MS = window.UNDO_MS_TEST || 5000, LOCKED = ['Approved', 'Ordered', 'Installed', 'Rejected'];
@@ -136,7 +136,7 @@ function effectHome(it) {
   if (!HOME || typeof tab !== 'string') return;
   var hits = function (kind) { return HOME.items.filter(function (x) { return x.project === tab && x.kind === kind && lineMatch(x, row, p.n); }); };
   if (it.fn === 'fieldUpdateStep' && p.status) hits('step').forEach(function (x) { x.status = p.status; x.done = p.status === 'Complete'; });
-  if (it.fn === 'fieldReceive') hits('inv').forEach(function (x) { x.done = true; });
+  if (it.fn === 'fieldReceive' || it.fn === 'fieldOrdered') hits('inv').forEach(function (x) { x.done = true; });
   if (it.fn === 'fieldDecide' && LOCKED.indexOf(p.status) > -1) hits('des').forEach(function (x) { x.done = true; });
   if (it.fn === 'fieldPaymentUpdate' && p.lien) hits('pay').forEach(function (x) { x.done = true; });
 }
@@ -150,7 +150,8 @@ function effectProj(it) {
     if (p.delay) s.delay = (Number(s.delay) || 0) + Number(p.delay);
     if (p.clearDelay) s.delay = 0;
   });
-  if (it.fn === 'fieldReceive') d.deliveries = keep(d.deliveries);
+  if (it.fn === 'fieldReceive') hit(d.deliveries).forEach(function (x) { x.status = 'Delivered'; x.done = true; x.flag = ''; if (p.storedAt) x.stored = p.storedAt; x.got = 'today'; });
+  if (it.fn === 'fieldOrdered') hit(d.deliveries).forEach(function (x) { x.status = 'Ordered'; x.flag = ''; });
   if (it.fn === 'fieldDecide') { hit(d.decisions).forEach(function (x) { x.status = p.status; }); if (LOCKED.indexOf(p.status) > -1) d.decisions = keep(d.decisions); }
   if (it.fn === 'fieldPaymentUpdate' && p.lien) hit(d.payments).forEach(function (x) { x.lien = p.lien; x.flag = 'OK'; });
 }
@@ -168,7 +169,7 @@ function rebuild() {
 }
 
 // ---------- loading ----------
-function applyHome(h) { HOME_RAW = h; ME = h.me || ''; TEAM = h.team || []; LISTS = h.lists || {}; }
+function applyHome(h) { HOME_RAW = h; ME = h.me || ''; TEAM = h.team || []; LISTS = h.lists || {}; CATALOG = h.catalog || []; }
 function refresh(manual) {
   var started = Date.now();
   api('fieldHome', []).then(function (h) {
@@ -249,7 +250,7 @@ function renderWork() {
   }
   if (prac.length) h += '<details class="prac"' + (real.length ? '' : ' open') + '><summary class="h2"><span>Practice: Example Project (' + prac.length + ')</span><span>›</span></summary>' +
     '<div class="hint" style="margin:0 4px 10px">Safe to tap anything here. It is a practice project.</div>' + prac.map(workCard).join('') + '</details>';
-  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button><div class="hint">App version 9</div></div>';
+  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">Refresh</button><div class="hint">App version 10</div></div>';
   return h;
 }
 function workCard(x) {
@@ -359,15 +360,110 @@ function stepRow(tab, s) {
     '<small>' + esc(s.start) + (s.finish && s.finish !== s.start ? ' → ' + esc(s.finish) : '') + (s.who ? ' · ' + esc(s.who) : '') + (s.delay ? ' · ' + s.delay + ' day delay' : '') + '</small>' +
     flagHtml(s.flag) + '</button><button class="sbtn ' + cls + '" ' + on(tap) + '>' + label + '</button></div>';
 }
+// Materials: what's still needed, what's on the way, what's in hand
+var ON_WAY = ['Ordered', 'Backordered', 'Shipped'];
+function matGroup(x) { return x.done || x.status === 'Delivered' || x.status === 'Installed' ? (x.status === 'Returned' ? '' : 'have') : ON_WAY.indexOf(x.status) > -1 ? 'way' : x.status === 'Cancelled' ? '' : 'need'; }
+function projType(tab) { var p = HOME && HOME.projects.filter(function (x) { return x.tab === tab; })[0]; return p ? p.type : ''; }
+function standardFor(type) { return (CATALOG || []).filter(function (m) { return m.steps && m.steps[type]; }); }
 function renderDeliveries(tab, d) {
-  var h = '<button class="btn" style="width:100%;margin-bottom:12px" ' + on(function () { formMaterial(tab); }) + '>+ Add material or receipt</button>';
-  if (!d.deliveries.length) return h + '<div class="empty"><b>Nothing on the way</b>Every material for this project is in hand.</div>';
-  return h + d.deliveries.map(function (x) {
-    return '<div class="card"><div class="title">' + esc(x.name) + '</div><div class="why">' + esc(x.vendor || 'Vendor not set') + (x.qty ? ' · qty ' + esc(x.qty) : '') +
-      ' · ' + esc(x.status || 'Needed') + (x.eta ? ' · arrives ' + esc(x.eta) : '') + (x.needed ? ' · needed ' + esc(x.needed) : '') + '</div>' + flagHtml(x.flag) +
-      '<button class="go" ' + on(function () { receiveSheet(tab, x.row, x.n, x.name); }) + '>I got it</button></div>';
-  }).join('');
+  var all = d.deliveries || [], type = projType(tab), std = standardFor(type);
+  var have = {}; all.forEach(function (x) { have[x.name.trim().toLowerCase()] = 1; });
+  var missing = std.filter(function (m) { return !have[m.item.toLowerCase()]; });
+  var h = '<div class="row" style="margin:0 0 6px"><button class="go" style="margin:0" ' + on(function () { pickMaterials(tab); }) + '>+ Add from list</button>' +
+    '<button class="btn" ' + on(function () { formMaterial(tab); }) + '>+ Something else</button></div>';
+  if (!all.length) {
+    return h + '<div class="empty"><b>No materials yet</b>' + (missing.length ? 'Start with the standard ' + esc(type) + ' list, then remove what this job doesn’t need in the sheet.' : 'Add what this job needs.') +
+      (missing.length ? '<button class="primary" ' + on(function () { loadStandard(tab); }) + '>Load the standard list (' + missing.length + ' items)</button>' : '') + '</div>';
+  }
+  var g = { need: [], way: [], have: [] };
+  all.forEach(function (x) { var k = matGroup(x); if (k) g[k].push(x); });
+  var card = function (x, k) {
+    var meta = [x.vendor, x.qty && x.qty !== 1 ? 'qty ' + x.qty : '', x.step ? 'step ' + x.step : '', k === 'way' && x.eta ? 'arrives ' + x.eta : '', k === 'need' && x.needed ? 'needed ' + x.needed : '']
+      .filter(Boolean).map(esc).join(' · ');
+    if (k === 'have') return '<div class="mrow"><b>' + esc(x.name) + '</b><small>' + (x.status === 'Installed' ? 'Installed' : 'In hand') + (x.stored ? ' · ' + esc(x.stored) : '') + (x.got ? ' · ' + esc(x.got) : '') + '</small></div>';
+    return '<div class="card"><div class="title" style="margin-top:0">' + esc(x.name) + '</div><div class="why">' + (meta || esc(x.status || 'Needed')) + (k === 'way' && x.status !== 'Ordered' ? ' · ' + esc(x.status) : '') + '</div>' + flagHtml(x.flag) +
+      (k === 'need'
+        ? '<div class="row"><button class="go soft" style="margin:0" ' + on(function () { orderedTap(tab, x); }) + '>Ordered</button><button class="go" style="margin:0" ' + on(function () { receiveSheet(tab, x.row, x.n, x.name); }) + '>Got it</button></div>'
+        : '<button class="go" ' + on(function () { receiveSheet(tab, x.row, x.n, x.name); }) + '>I got it</button>') + '</div>';
+  };
+  [['need', 'Still need'], ['way', 'On the way']].forEach(function (s) {
+    if (g[s[0]].length) h += '<div class="h2">' + s[1] + ' (' + g[s[0]].length + ')</div>' + g[s[0]].map(function (x) { return card(x, s[0]); }).join('');
+  });
+  if (!g.need.length && !g.way.length) h += '<div class="empty"><div class="big">✓</div><b>Everything is in hand</b></div>';
+  if (g.have.length) h += '<details class="prac"><summary class="h2"><span>In hand (' + g.have.length + ')</span><span>›</span></summary><div class="mlist">' + g.have.map(function (x) { return card(x, 'have'); }).join('') + '</div></details>';
+  if (missing.length) h += '<div style="text-align:center;margin-top:14px"><button class="linkbtn" ' + on(function () { loadStandard(tab); }) + '>Add the rest of the standard list (' + missing.length + ')</button></div>';
+  return h;
 }
+function orderedTap(tab, x) { save('fieldOrdered', [tab, x.row, { n: x.n }], 'Ordered · ' + x.name, x.name + ': ordered'); }
+
+// Pick from the Materials List tab: the standard items for this project type first, everything else one tap away
+function pickMaterials(tab) {
+  var type = projType(tab), std = standardFor(type), sel = {}, mode = std.length ? 'std' : 'all', q = '';
+  var have = {}; ((PROJ[tab] && PROJ[tab].deliveries) || []).forEach(function (x) { have[x.name.trim().toLowerCase()] = 1; });
+  if (!(CATALOG || []).length) { toast('The Materials List is empty. Add items on the Materials List tab in the sheet.', 5000); return; }
+  var count = function () { return Object.keys(sel).length; };
+  var body = function () {
+    var list = (mode === 'std' ? std : CATALOG).filter(function (m) { return !q || m.item.toLowerCase().indexOf(q) > -1 || m.cat.toLowerCase().indexOf(q) > -1; });
+    if (!list.length) return '<div class="empty">Nothing matches.</div>';
+    var cats = [], by = {};
+    list.forEach(function (m) { var c = m.cat || 'Other'; if (!by[c]) { by[c] = []; cats.push(c); } by[c].push(m); });
+    return cats.map(function (c) {
+      return '<div class="sec">' + esc(c) + '</div>' + by[c].map(function (m) {
+        var got = have[m.item.toLowerCase()], on_ = sel[m.item] !== undefined, step = m.steps && m.steps[type];
+        return '<div class="pick' + (on_ ? ' on' : '') + (got ? ' got' : '') + '" data-item="' + esc(m.item) + '"><i class="chk"></i><span class="pt"><b>' + esc(m.item) + '</b><small>' +
+          (got ? 'Already on this job' : [m.vendor, m.unit ? 'per ' + m.unit : '', step ? 'step ' + step : ''].filter(Boolean).map(esc).join(' · ')) + '</small></span>' +
+          (on_ ? '<input class="qty" type="number" inputmode="decimal" min="0" value="' + esc(sel[m.item]) + '" aria-label="Quantity">' : '') + '</div>';
+      }).join('');
+    }).join('');
+  };
+  var redraw = function () { $('pk_list').innerHTML = body(); var b = $('pk_go'); b.disabled = !count(); b.textContent = count() ? 'Add ' + plural(count(), 'material') : 'Pick materials'; };
+  openSheet('Add materials', function () {
+    return '<div class="sub">' + esc(tab) + (type ? ' · ' + esc(type) : '') + '</div>' +
+      (std.length ? '<div class="who" style="margin:10px 0"><button class="on" id="pk_std">Standard for this job</button><button id="pk_all">All materials</button></div>' : '') +
+      '<input id="pk_q" placeholder="Search materials" autocomplete="off">' +
+      '<div id="pk_list">' + body() + '</div>' +
+      '<div class="pkbar"><button class="primary" id="pk_go" disabled>Pick materials</button></div>';
+  });
+  if (std.length) {
+    $('pk_std').onclick = function () { mode = 'std'; $('pk_std').className = 'on'; $('pk_all').className = ''; redraw(); };
+    $('pk_all').onclick = function () { mode = 'all'; $('pk_all').className = 'on'; $('pk_std').className = ''; redraw(); };
+  }
+  $('pk_q').oninput = function () { q = this.value.trim().toLowerCase(); redraw(); };
+  $('pk_list').onclick = function (e) {
+    if (e.target.className === 'qty') return;
+    var row = e.target.closest('.pick'); if (!row || / got/.test(row.className)) return;
+    var it = row.getAttribute('data-item');
+    if (sel[it] !== undefined) delete sel[it]; else sel[it] = 1;
+    redraw();
+  };
+  $('pk_list').oninput = function (e) { if (e.target.className === 'qty') sel[e.target.closest('.pick').getAttribute('data-item')] = e.target.value; };
+  $('pk_go').onclick = function () {
+    var items = CATALOG.filter(function (m) { return sel[m.item] !== undefined; }).map(function (m) { return matItem(m, type, sel[m.item]); });
+    addMaterials(tab, items, this);
+  };
+}
+function matItem(m, type, qty) { return { item: m.item, cat: m.cat, vendor: m.vendor, cost: m.cost, step: m.steps && m.steps[type] || '', qty: Number(qty) > 0 ? Number(qty) : 1 }; }
+function addMaterials(tab, items, b) {
+  var label = b.textContent; b.disabled = true; b.textContent = 'Adding…';
+  api('fieldAddMaterials', [tab, items], newId()).then(function (r) {
+    closeSheet();
+    toast(r.added ? 'Added ' + plural(r.added, 'material') + (r.skipped.length ? ' (' + r.skipped.length + ' already there)' : '') : 'Those are already on this job', 4000);
+    loadProject(tab);
+  }, function (e) { b.disabled = false; b.textContent = label; fail(e); });
+}
+function loadStandard(tab) {
+  var type = projType(tab), have = {};
+  ((PROJ[tab] && PROJ[tab].deliveries) || []).forEach(function (x) { have[x.name.trim().toLowerCase()] = 1; });
+  var list = standardFor(type).filter(function (m) { return !have[m.item.toLowerCase()]; });
+  openSheet('Load the standard list?', function () {
+    return '<div class="sub">' + esc(tab) + ' · ' + esc(type) + '</div>' +
+      '<p>Adds <b>' + plural(list.length, 'material') + '</b> from the standard ' + esc(type) + ' list as <b>Still need</b>, each linked to its step. Anything already on this job is skipped.</p>' +
+      '<div class="hint">Change the standard list on the Materials List tab in the sheet. Remove what a job doesn’t need on its tab.</div>' +
+      '<button class="primary" id="ls_go" ' + on(function (e, el) { addMaterials(tab, list.map(function (m) { return matItem(m, type, 1); }), el); }) + '>Add ' + plural(list.length, 'material') + '</button>' +
+      '<button class="primary soft" onclick="closeSheet()">Not now</button>';
+  });
+}
+
 function renderDecisions(tab, d) {
   if (!d.decisions.length) return '<div class="empty"><b>No open design choices</b>Everything is decided.</div>';
   return d.decisions.map(function (x) {

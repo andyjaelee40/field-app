@@ -164,3 +164,16 @@ label.l { display:block; font-size:14px; font-weight:600; color:var(--muted); ma
 .slide .pic { font-size:64px; margin-bottom:14px; }
 .dots { display:flex; justify-content:center; gap:8px; margin:24px 0 8px; }
 .dots i { width:8px; height:8px; border-radius:4px; background:var(--line); } .dots i.on { background:var(--sumi); }
+
+/* materials */
+.mlist { background:var(--card); border:1px solid var(--line); border-radius:18px; overflow:hidden; }
+.mrow { padding:12px 16px; border-bottom:1px solid var(--line); } .mrow:last-child { border-bottom:0; }
+.mrow b { display:block; font-weight:600; } .mrow small { color:var(--muted); font-size:14px; }
+.pick { display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:1px solid var(--line); cursor:pointer; }
+.pick .pt { flex:1; min-width:0; } .pick b { display:block; font-weight:600; } .pick small { color:var(--muted); font-size:14px; }
+.chk { flex:0 0 auto; width:26px; height:26px; border-radius:13px; border:1.5px solid #C2B8AA; background:var(--card); }
+.pick.on .chk { background:var(--sumi) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/16px no-repeat; border-color:var(--sumi); }
+.pick.got { opacity:.5; cursor:default; } .pick.got .chk { border-style:dashed; }
+.pick .qty { width:64px; flex:0 0 auto; padding:9px; text-align:center; }
+.pkbar { position:sticky; bottom:calc(-28px - env(safe-area-inset-bottom)); background:var(--card); padding:8px 0 4px; margin-top:8px; }
+.pkbar .primary { margin-top:0; }
