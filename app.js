@@ -21,7 +21,7 @@ function store(k, v) { try { if (v === undefined) return localStorage.getItem(k)
 function cacheGet(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
 function cachePut(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 function clone(x) { return x ? JSON.parse(JSON.stringify(x)) : x; }
-var APP_V = 15;
+var APP_V = 16;
 // Anything that breaks on a phone goes to the App Errors tab (a few per session at most), so it gets fixed without anyone reporting it
 var ERR_SENT = 0;
 function reportError(msg, where) {
@@ -587,6 +587,8 @@ function renderLabor() {
         (x.paid ? ' · ' + t('paid') : '') + (x.where ? '<br>' + esc(whereTxt(x.where)) : '') + '</small></span><span class="amt1">' + money(x.cost) + '</span></div>';
     }).join('') + '</div>';
   }
+  if (HOME && HOME.payroll) h += '<label class="tog payt"><input type="checkbox" id="lw_mail"' + (HOME.payroll.on ? ' checked' : '') + ' ' + on(function (e, el) { payrollSwitch(el); }, 'onchange') + '> ' +
+    t('Email me the payroll every Friday at 3pm') + '</label>';
   var ytd = d.ytd || {}, yn = Object.keys(ytd).sort();
   if (yn.length) h += '<div class="h2">' + t('This year so far') + '</div><div class="mlist">' + yn.map(function (n) {
     return '<div class="mrow pay"><b>' + esc(n) + '<span>' + money(ytd[n].cost) + '</span></b><small>' + t('{d} days', { d: fmtDays(ytd[n].days) }) + (ytd[n].cost >= 600 ? ' · ' + t('$600 or more: may need a 1099') : '') + '</small></div>';
@@ -597,6 +599,13 @@ function renderLabor() {
     laborCall('fieldLaborPaid', [wk], el);
   }) + '>' + t('Mark this week paid') + '</button>';
   return h;
+}
+function payrollSwitch(el) {
+  var want = el.checked; el.disabled = true;
+  api('fieldPayrollEmail', [want], newId()).then(function (r) {
+    el.disabled = false; HOME.payroll.on = r.on; if (HOME_RAW && HOME_RAW.payroll) { HOME_RAW.payroll.on = r.on; cachePut('pcc_home', HOME_RAW); }
+    toast(r.on ? t('Payroll email is on: Fridays at 3pm.') : t('Payroll email is off.'));
+  }, function (e) { el.disabled = false; el.checked = !want; fail(e); });
 }
 function whereTxt(w) { var m = String(w).split(' · ')[0]; return LANG !== 'es' ? m : m.replace(/^On site/, 'En la obra').replace(/ mi from job$/, ' mi de la obra').replace(/^At /, 'En '); }
 function laborEdit(x) {

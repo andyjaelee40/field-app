@@ -208,7 +208,7 @@ var ES = {
   'Add a store': 'Agregar una tienda', 'Add a place': 'Agregar un lugar', 'None yet.': 'Ninguno todavía.', 'Name': 'Nombre', 'Take off the list': 'Quitar de la lista',
   'Jobs that use it keep it. It just stops showing as a choice.': 'Las obras que lo usan lo conservan. Solo deja de salir como opción.', 'Enter a name.': 'Escribe un nombre.',
   'Renamed to {x}': 'Nuevo nombre: {x}',
-  'This year so far': 'En lo que va del año', '$600 or more: may need a 1099': '$600 o más: puede necesitar un 1099',
+  'This year so far': 'En lo que va del año', 'Email me the payroll every Friday at 3pm': 'Enviarme la nómina cada viernes a las 3pm', 'Payroll email is on: Fridays at 3pm.': 'Correo de nómina activado: viernes a las 3pm.', 'Payroll email is off.': 'Correo de nómina desactivado.', '$600 or more: may need a 1099': '$600 o más: puede necesitar un 1099',
   'If your phone asks, allow location: it only records how far you are from the job, once, when you check in.': 'Si tu teléfono pregunta, permite la ubicación: solo anota qué tan lejos estás de la obra, una vez, al registrarte.',
   'One receipt, several items': 'Un recibo, varias cosas', 'Split it across items and jobs': 'Repartirlo entre cosas y obras',
   'Progress report for a client or lender': 'Informe de avance para cliente o prestamista', 'Past jobs: about {x}': 'Obras anteriores: aprox. {x}',

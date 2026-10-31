@@ -223,3 +223,4 @@ img.big { display:block; width:100%; border-radius:14px; margin-top:6px; }
 .sprow .x { flex:none; border:0; background:none; color:var(--muted); font-size:22px; padding:4px 6px; }
 /* budget: what past jobs spent on the step */
 .bghint { display:block; color:var(--muted); font-size:12px; font-weight:400; }
+.tog.payt { display:flex; gap:10px; align-items:center; margin:12px 4px 0; font-size:15px; }
