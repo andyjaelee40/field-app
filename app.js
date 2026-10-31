@@ -6,7 +6,7 @@
 // Crew links (HOME.crew) get a simpler app: their work, steps, materials, photos and receipts. The server also refuses
 // money and owner-only actions for them, so hiding buttons here is for clarity, not the only lock.
 
-var HOME_RAW = null, HOME = null, HOME_AT = 0, RAW = {}, RAW_AT = {}, PROJ = {}, SHOP_RAW = null, SHOP = null, SHOP_AT = 0, PHOTOS = {};
+var HOME_RAW = null, HOME = null, HOME_AT = 0, RAW = {}, RAW_AT = {}, PROJ = {}, SHOP_RAW = null, SHOP = null, SHOP_AT = 0, PHOTOS = {}, LABOR_WK = null;
 var ME = '', TEAM = [], LISTS = {}, CATALOG = [], TSTEPS = {}, WHO = 'mine', CREW = false;
 var VIEW = { name: 'work' }, PTAB = 'steps', ONLY_MINE = false, SHOW_DONE = false, SHOP_PROJ = '';
 var QUEUE = [], SENT = [], SENDING = false, OFFLINE = false, DIRTY = false, LASTOK = 0;
@@ -176,6 +176,12 @@ function effectProj(it) {
   if (it.fn === 'fieldDecide') { hit(d.decisions).forEach(function (x) { x.status = p.status; }); if (LOCKED.indexOf(p.status) > -1) d.decisions = keep(d.decisions); }
   if (it.fn === 'fieldPaymentUpdate' && p.lien) hit(d.payments).forEach(function (x) { x.lien = p.lien; x.flag = 'OK'; });
 }
+function effectLabor(it) {
+  if (!HOME || it.fn !== 'fieldLaborCheckIn') return;
+  var p = it.args[0], mine = (HOME.myDay || []).filter(function (x) { return x.project !== p.project; });
+  var others = mine.reduce(function (s, x) { return s + x.days; }, 0);
+  HOME.myDay = (others + p.days > 1 ? [] : mine).concat([{ project: p.project, days: p.days }]);
+}
 function effectShop(it) {
   if (!SHOP || (it.fn !== 'fieldReceive' && it.fn !== 'fieldOrdered')) return;
   var a = it.args, p = a[2] || {};
@@ -187,7 +193,7 @@ function rebuild() {
   SENT = SENT.filter(function (x) { return Date.now() - x.sentAt < 600000; });
   // a save sent before a copy was fetched is already in that copy
   SENT.concat(QUEUE).forEach(function (it) {
-    if (!(it.sentAt < HOME_AT)) effectHome(it);
+    if (!(it.sentAt < HOME_AT)) { effectHome(it); effectLabor(it); }
     if (!(it.sentAt < SHOP_AT)) effectShop(it);
     var tab = it.args && it.args[0];
     if (typeof tab === 'string' && !(it.sentAt < (RAW_AT[tab] || 0))) effectProj(it);
@@ -257,6 +263,7 @@ function go(name, tab) {
   VIEW = { name: name, tab: tab };
   if (name === 'project') { PTAB = 'steps'; ONLY_MINE = CREW; if (!RAW[tab]) { var c = cacheGet('pcc_p_' + tab); if (c) { RAW[tab] = c; } } rebuild(); loadProject(tab); }
   else if (name === 'shop') { rebuild(); loadShop(); }
+  else if (name === 'labor') { if (!LABOR_WK) LABOR_WK = { monday: mondayOf(today()) }; render(); loadLabor(); }
   else render();
   $('scroll').scrollTop = 0;
 }
@@ -266,9 +273,9 @@ function head(title, sub, back) {
 }
 function render() {
   V = []; REG = 'V';
-  $('n-work').className = VIEW.name === 'work' || VIEW.name === 'shop' ? 'on' : '';
+  $('n-work').className = VIEW.name === 'work' || VIEW.name === 'shop' || VIEW.name === 'labor' ? 'on' : '';
   $('n-projects').className = VIEW.name === 'projects' || VIEW.name === 'project' ? 'on' : '';
-  var html = VIEW.name === 'work' ? renderWork() : VIEW.name === 'shop' ? renderShop() : VIEW.name === 'projects' ? renderProjects() : renderProject(VIEW.tab);
+  var html = VIEW.name === 'work' ? renderWork() : VIEW.name === 'shop' ? renderShop() : VIEW.name === 'labor' ? renderLabor() : VIEW.name === 'projects' ? renderProjects() : renderProject(VIEW.tab);
   $('view').innerHTML = html;
 }
 
@@ -285,6 +292,13 @@ function renderWork() {
     '<button class="' + (WHO === 'all' ? 'on' : '') + '" ' + on(function () { WHO = 'all'; render(); }) + '>' + t('Everyone') + '</button></div>');
   if (real.length) h += '<div class="counts"><div class="c-late"><b>' + c[0] + '</b><span>' + t('Late') + '</span></div><div class="c-att"><b>' + c[1] + '</b><span>' + t('Needs a look') + '</span></div><div class="c-week"><b>' + c[2] + '</b><span>' + t('This week') + '</span></div></div>';
   h += '</div>';
+  if (HOME.checkin) {
+    var day = HOME.myDay || [];
+    h += '<button class="shopbtn checkin' + (day.length ? ' done' : '') + '" ' + on(checkinSheet) + '><span class="si">' + (day.length ? '✓' : '📍') + '</span><span class="pt"><b>' +
+      (day.length ? t('Today: {x}', { x: day.map(function (x) { return x.project + (x.days === 0.5 ? ' (' + t('half day') + ')' : ''); }).join(', ') }) : t('Where are you working today?')) +
+      '</b><small>' + (day.length ? t('Tap to change') : t('Tap to check in. It counts your day on that job.')) + '</small></span><span class="chev">›</span></button>';
+  }
+  if (!CREW) h += '<button class="shopbtn" ' + on(function () { go('labor'); }) + '><span class="si lab">👷</span><span class="pt"><b>' + t('Labor this week') + '</b><small>' + t('Who worked where, and what to pay') + '</small></span><span class="chev">›</span></button>';
   var toBuy = SHOP ? SHOP.length : null;
   h += '<button class="shopbtn" ' + on(function () { go('shop'); }) + '><span class="si">🛒</span><span class="pt"><b>' + t('Shopping list') + '</b><small>' +
     (toBuy === null ? t('Everything to buy, on every job, by store') : toBuy ? tn(toBuy, 'item') + ' ' + t('to buy') : t('Nothing to buy right now')) + '</small></span><span class="chev">›</span></button>';
@@ -298,7 +312,7 @@ function renderWork() {
   }
   if (prac.length) h += '<details class="prac"' + (real.length ? '' : ' open') + '><summary class="h2"><span>' + t('Practice: Example Project') + ' (' + prac.length + ')</span><span>›</span></summary>' +
     '<div class="hint" style="margin:0 4px 10px">' + t('Safe to tap anything here. It is a practice project.') + '</div>' + prac.map(workCard).join('') + '</details>';
-  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">' + t('Refresh') + '</button><div class="hint">' + t('App version') + ' 12</div></div>';
+  h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" onclick="refresh(true)">' + t('Refresh') + '</button><div class="hint">' + t('App version') + ' 13</div></div>';
   return h;
 }
 function workCard(x) {
@@ -341,7 +355,147 @@ function renderShop() {
   h += '<div style="text-align:center;margin-top:16px"><button class="linkbtn" ' + on(function () { loadShop().then(function () { toast(t('Up to date')); }); }) + '>' + t('Refresh') + '</button></div>';
   return h;
 }
-function bought(x) { save('fieldReceive', [x.project, x.row, { n: x.n }], t('Bought') + ' · ' + x.name, t('{x}: bought', { x: x.name })); }
+function bought(x) {
+  openSheet(t('Bought: {x}', { x: x.name }), function () {
+    return '<div class="sub">' + esc(x.project) + (x.qty && x.qty !== 1 ? ' · ' + t('qty') + ' ' + esc(x.qty) : '') + (x.vendor ? ' · ' + esc(x.vendor) : '') + '</div>' + priceBlock('by') +
+      '<button class="primary" id="by_go">' + t('Save') + '</button>' +
+      '<button class="primary soft" id="by_skip">' + t('Bought, no price yet') + '</button>';
+  });
+  priceWire('by');
+  var done = function (withPrice) {
+    var p = { n: x.n };
+    if (withPrice) { var tot = $('by_total').value; if (tot) p.total = tot; if ($('by_vendor').value.trim()) p.vendor = $('by_vendor').value.trim(); if (RECEIPT) { p.name = RECEIPT.name; p.mime = RECEIPT.mime; p.data = RECEIPT.data; } }
+    closeSheet(); save('fieldReceive', [x.project, x.row, p], t('Bought') + ' · ' + x.name, t('{x}: bought', { x: x.name }));
+  };
+  $('by_go').onclick = function () { done(true); };
+  $('by_skip').onclick = function () { done(false); };
+}
+// "What did it cost?" with a receipt scan that fills the total. Shared by Bought, Got it and the receipt form.
+function priceBlock(id) {
+  return '<label class="photo scan" id="' + id + '_lbl">🧾 ' + t('Scan the receipt') + '<input id="' + id + '_file" type="file" accept="image/*"></label>' +
+    '<div class="hint" id="' + id + '_read"></div>' +
+    '<div class="two"><div>' + field(t('What did it cost? ($)'), '<input id="' + id + '_total" type="number" inputmode="decimal" min="0" step="0.01">') + '</div><div>' +
+    field(t('Where from?'), '<input id="' + id + '_vendor" list="' + id + '_vendors"><datalist id="' + id + '_vendors">' + opts(LISTS.vendors) + '</datalist>') + '</div></div>';
+}
+function priceWire(id) {
+  RECEIPT = null;
+  $(id + '_file').onchange = function () {
+    var inp = this;
+    withFile(inp, function (f) {
+      if (!f) return;
+      RECEIPT = f; $(id + '_lbl').className = 'photo scan has'; $(id + '_read').textContent = t('Reading the receipt…');
+      api('fieldReadReceipt', [{ data: f.data, mime: f.mime }]).then(function (r) {
+        if (!$(id + '_read')) return;
+        if (r.total && !$(id + '_total').value) $(id + '_total').value = r.total;
+        if (r.vendor && !$(id + '_vendor').value) $(id + '_vendor').value = r.vendor;
+        $(id + '_read').textContent = r.found ? t('Read it: {x}. Check it and fix anything that is off.', { x: [r.vendor, r.total ? '$' + Number(r.total).toFixed(2) : '', r.date].filter(Boolean).join(' · ') })
+          : t('Could not read this one. The photo is kept as the receipt; fill in the rest.');
+      }, function (e) { if ($(id + '_read')) $(id + '_read').textContent = e.net ? t('No signal to read it now. The photo is kept as the receipt; fill in the rest.') : t('Could not read this one. The photo is kept as the receipt; fill in the rest.'); });
+    });
+  };
+}
+
+// ---------- Labor: crew check in each day; owners and PMs see the week and what to pay ----------
+function checkinSheet() {
+  var pick = { project: (HOME.myDay && HOME.myDay[0] && HOME.myDay[0].project) || '', days: 1 };
+  var list = HOME.projects.filter(function (p) { return !p.practice; });
+  openSheet(t('Where are you working today?'), function () {
+    return '<div class="sub">' + esc(dateLine()) + '</div>' +
+      '<div class="chips col">' + list.map(function (p) {
+        return '<button class="chip' + (pick.project === p.tab ? ' on' : '') + '" ' + on(function (e, el) { pick.project = p.tab; pickOne(el); }) + '>' + esc(p.tab) + '</button>';
+      }).join('') + '</div>' +
+      '<div class="sec">' + t('How long?') + '</div><div class="three">' +
+      '<button class="st3 cp on" ' + on(function (e, el) { pick.days = 1; pickOne(el); }) + '>' + t('Full day') + '</button>' +
+      '<button class="st3 cp" ' + on(function (e, el) { pick.days = 0.5; pickOne(el); }) + '>' + t('Half day') + '</button></div>' +
+      '<button class="primary" ' + on(function () {
+        if (!need(pick.project, t('Pick the job.'))) return;
+        closeSheet();
+        save('fieldLaborCheckIn', [{ project: pick.project, days: pick.days, date: today() }], t('Check in') + ' · ' + pick.project,
+          t('Checked in: {x}', { x: pick.project + (pick.days === 0.5 ? ' (' + t('half day') + ')' : '') }));
+      }) + '>' + t('Check in') + '</button>' +
+      '<div class="hint">' + t('Worked two jobs today? Check in a half day at each.') + '</div>';
+  });
+}
+function mondayOf(ymd) { var d = new Date(ymd + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7); return d.toISOString().slice(0, 10); }
+function addDays(ymd, n) { var d = new Date(ymd + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function dayName(ymd) { return new Date(ymd + 'T12:00:00Z').toLocaleDateString(LANG === 'es' ? 'es' : undefined, { weekday: 'short', month: 'numeric', day: 'numeric', timeZone: 'UTC' }); }
+function loadLabor() {
+  var wk = LABOR_WK.monday;
+  LABOR_WK.loading = true;
+  return api('fieldLaborWeek', [wk]).then(function (r) {
+    if (LABOR_WK.monday !== wk) return;
+    LABOR_WK = { monday: r.monday, data: r }; if (VIEW.name === 'labor') render();
+  }, function (e) { LABOR_WK.loading = false; LABOR_WK.err = e.net ? t('No signal right now.') : srvMsg(e.message); if (e.code === 'auth') gate(e.message); else render(); });
+}
+function laborCall(fn, args, b) {
+  if (b) { b.disabled = true; b.textContent = t('Saving…'); }
+  return api(fn, args, newId()).then(function (r) { LABOR_WK = { monday: r.monday, data: r }; closeSheet(); render(); refresh(); },
+    function (e) { if (b) b.disabled = false; fail(e); });
+}
+function renderLabor() {
+  var wk = LABOR_WK.monday, d = LABOR_WK.data;
+  head(t('Labor'), t('Week of {x}', { x: dayName(wk) }), 'work');
+  var h = '<div class="seg"><button ' + on(function () { LABOR_WK = { monday: addDays(wk, -7) }; render(); loadLabor(); }) + '>‹ ' + t('Last week') + '</button>' +
+    '<button class="on">' + t('Week of {x}', { x: dayName(wk) }) + '</button>' +
+    '<button ' + on(function () { LABOR_WK = { monday: addDays(wk, 7) }; render(); loadLabor(); }) + '>' + t('Next week') + ' ›</button></div>';
+  if (!d) return h + '<div class="spin">' + (LABOR_WK.err ? esc(LABOR_WK.err) : t('Loading…')) + '</div>';
+  var people = {}, projects = {}, total = 0, unpaid = 0;
+  d.rows.forEach(function (x) {
+    var p = people[x.worker] = people[x.worker] || { days: 0, cost: 0, rate: x.rate };
+    p.days += x.days; p.cost += x.cost;
+    var j = projects[x.project] = projects[x.project] || { days: 0, cost: 0 };
+    j.days += x.days; j.cost += x.cost;
+    total += x.cost; if (!x.paid) unpaid += x.cost;
+  });
+  var fmtDays = function (n) { return n % 1 ? n.toFixed(1) : String(n); };
+  h += '<div class="sum"><div><b>' + money(total) + '</b><span>' + t('Labor this week') + '</span></div><div><b>' + money(unpaid) + '</b><span>' + t('Still to pay') + '</span></div></div>';
+  if (d.noRate.length) h += '<div class="note">' + t('No day rate on the Team tab for: {x}. Their days count, but cost $0 until you add one.', { x: esc(d.noRate.join(', ')) }) + '</div>';
+  h += '<div class="h2">' + t('Pay each person') + '</div>';
+  var names = Object.keys(people);
+  h += names.length ? '<div class="mlist">' + names.map(function (n) {
+    var p = people[n];
+    return '<div class="mrow pay"><b>' + esc(n) + '<span>' + money(p.cost) + '</span></b><small>' + t('{d} days', { d: fmtDays(p.days) }) + (p.rate ? ' × ' + money(p.rate) : '') + '</small></div>';
+  }).join('') + '</div>' : '<div class="card why">' + t('Nobody checked in this week yet.') + '</div>';
+  h += '<div class="h2">' + t('By job') + '</div>' + (Object.keys(projects).length ? '<div class="mlist">' + Object.keys(projects).map(function (n) {
+    return '<div class="mrow pay"><b>' + esc(n) + '<span>' + money(projects[n].cost) + '</span></b><small>' + t('{d} crew days', { d: fmtDays(projects[n].days) }) + '</small></div>';
+  }).join('') + '</div>' : '');
+  h += '<div class="h2">' + t('Day by day') + '</div>';
+  for (var i = 0; i < 7; i++) {
+    var day = addDays(wk, i), rows = d.rows.filter(function (x) { return x.date === day; });
+    if (!rows.length) continue;
+    h += '<div class="sec">' + esc(dayName(day)) + '</div><div class="mlist">' + rows.map(function (x) {
+      return '<div class="pick" ' + on(function () { laborEdit(x); }) + '><span class="pt"><b>' + esc(x.worker) + '</b><small>' + esc(x.project) + ' · ' + (x.days === 0.5 ? t('half day') : t('full day')) +
+        (x.paid ? ' · ' + t('paid') : '') + '</small></span><span class="amt1">' + money(x.cost) + '</span></div>';
+    }).join('') + '</div>';
+  }
+  h += '<button class="btn" style="width:100%;margin-top:14px" ' + on(function () { laborEdit(null); }) + '>+ ' + t('Add a day') + '</button>';
+  if (unpaid > 0) h += '<button class="primary" id="lw_paid" ' + on(function (e, el) {
+    if (el.getAttribute('data-sure') !== '1') { el.setAttribute('data-sure', '1'); el.textContent = t('Tap again: mark {x} paid', { x: money(unpaid) }); return; }
+    laborCall('fieldLaborPaid', [wk], el);
+  }) + '>' + t('Mark this week paid') + '</button>';
+  return h;
+}
+function laborEdit(x) {
+  var e = x ? { id: x.id, date: x.date, worker: x.worker, project: x.project, days: x.days } : { id: '', date: today(), worker: '', project: '', days: 1 };
+  openSheet(x ? t('Change this day') : t('Add a day'), function () {
+    return field(t('Who'), '<select id="le_w">' + opts(TEAM, e.worker, true) + '</select>') +
+      field(t('Job'), '<select id="le_p">' + opts(HOME.projects.filter(function (p) { return !p.practice; }).map(function (p) { return p.tab; }), e.project, true) + '</select>') +
+      '<div class="two"><div>' + field(t('Date'), '<input id="le_d" type="date" value="' + esc(e.date) + '">') + '</div><div>' +
+      field(t('How long?'), '<select id="le_n"><option value="1"' + (e.days === 1 ? ' selected' : '') + '>' + t('Full day') + '</option><option value="0.5"' + (e.days === 0.5 ? ' selected' : '') + '>' + t('Half day') + '</option></select>') + '</div></div>' +
+      (x && x.paid ? '<div class="note">' + t('This day is already marked paid.') + '</div>' : '') +
+      '<button class="primary" id="le_go">' + t('Save') + '</button>' +
+      (x ? '<button class="primary soft danger-text" id="le_rm">' + t('Remove this day') + '</button>' : '');
+  });
+  $('le_go').onclick = function () {
+    var v = { id: e.id, worker: $('le_w').value, project: $('le_p').value, date: $('le_d').value, days: Number($('le_n').value) };
+    if (!need(v.worker, t('Pick who.')) || !need(v.project, t('Pick the job.')) || !need(v.date, t('Pick the date.'))) return;
+    laborCall('fieldLaborSet', [v], this);
+  };
+  if (x) $('le_rm').onclick = function () {
+    if (this.getAttribute('data-sure') !== '1') { this.setAttribute('data-sure', '1'); this.textContent = t('Tap again to remove'); return; }
+    laborCall('fieldLaborRemove', [x.id, LABOR_WK.monday], this);
+  };
+}
 
 // ---------- Projects ----------
 var HOUSE = '<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-6h4v6"/></svg>';
@@ -668,6 +822,12 @@ function renderMoney(tab, d) {
     '<div><b style="color:' + (d.remaining < 0 ? 'var(--red)' : 'var(--grn)') + '">' + money(d.remaining) + '</b><span>' + (d.remaining < 0 ? t('Over') : t('Left')) + '</span></div></div>';
   else h += '<div class="note">' + t('No budget entered yet. Spent so far: <b>{x}</b>', { x: money(d.spent) }) + '</div>';
   h += '<button class="btn" style="width:100%;margin-top:8px" ' + on(function () { budgetSheet(tab); }) + '>' + (d.budget > 0 ? t('Change the budget') : t('Set the budget')) + '</button>';
+  if (d.labor) {
+    var lb = d.labor;
+    h += '<div class="h2">' + t('Labor') + '</div><div class="sum"><div><b>' + money(lb.budget) + '</b><span>' + t('Labor budget') + '</span></div><div><b>' + money(lb.spent) + '</b><span>' + t('Labor spent') + '</span></div>' +
+      '<div><b>' + (lb.days % 1 ? lb.days.toFixed(1) : lb.days) + '</b><span>' + t('Crew days') + '</span></div></div>' +
+      (lb.budget > 0 && lb.spent > lb.budget ? '<div class="note">' + t('Labor is {x} over its budget.', { x: money(lb.spent - lb.budget) }) + '</div>' : '');
+  }
   if (d.lender > 0) h += '<div class="note">' + t('Lender still owes you back <b>{x}</b> on submitted draws.', { x: money(d.lender) }) + '</div>';
   h += '<div class="h2">' + t('Signed work') + '</div><div class="sum"><div><b>' + money(signed) + '</b><span>' + t('Signed') + '</span></div><div><b>' + money(paid) + '</b><span>' + t('Paid') + '</span></div><div><b>' + money(owed) + '</b><span>' + t('Still owed') + '</span></div></div>';
   h += '<div class="h2">' + t('Contracts &amp; bids') + '</div>';
@@ -697,12 +857,14 @@ function renderMoney(tab, d) {
 function budgetSheet(tab, then) {
   var d = PROJ[tab];
   if (!d) { openSheet(t('Loading…'), function () { return '<div class="spin">' + t('One moment…') + '</div>'; }); loadProject(tab).then(function () { if (PROJ[tab]) budgetSheet(tab, then); }); return; }
-  var total = function () { var s = 0; [].forEach.call(document.querySelectorAll('#bg_list input'), function (i) { s += Number(i.value) || 0; }); $('bg_total').textContent = money(s); };
+  var total = function () { var s = Number($('bg_labor').value) || 0; [].forEach.call(document.querySelectorAll('#bg_list input'), function (i) { s += Number(i.value) || 0; }); $('bg_total').textContent = money(s); };
   openSheet(t('Budget'), function () {
     var phases = [], by = {};
     d.steps.forEach(function (s) { if (!by[s.phase]) { by[s.phase] = []; phases.push(s.phase); } by[s.phase].push(s); });
     return '<div class="sub">' + esc(tab) + '</div><div class="bgtop"><span>' + t('Total budget') + '</span><b id="bg_total">$0</b></div>' +
-      '<div class="hint">' + t('Whole dollars per step. Leave blank for steps with no cost.') + '</div><div id="bg_list">' +
+      '<div class="hint">' + t('Whole dollars per step. Leave blank for steps with no cost.') + '</div>' +
+      '<div class="bgrow lab"><span><b>' + t('Labor (crew days)') + '</b></span><input id="bg_labor" type="number" inputmode="numeric" min="0" step="1" data-o="' + esc(d.labor ? d.labor.budget || '' : '') + '" value="' + esc(d.labor ? d.labor.budget || '' : '') + '"></div>' +
+      '<div id="bg_list">' +
       phases.map(function (ph) {
         return '<div class="sec">' + esc(ph) + '</div>' + by[ph].map(function (s) {
           return '<div class="bgrow"><span>' + esc(s.name) + '</span><input type="number" inputmode="numeric" min="0" step="1" data-r="' + s.row + '" data-o="' + esc(s.budget) + '" value="' + esc(s.budget) + '"></div>';
@@ -711,13 +873,14 @@ function budgetSheet(tab, then) {
       '<div class="pkbar"><button class="primary" id="bg_go">' + t('Save budget') + '</button></div>';
   });
   total();
-  $('bg_list').oninput = total;
+  $('bg_list').oninput = total; $('bg_labor').oninput = total;
   $('bg_go').onclick = function () {
     var b = this, ch = [].slice.call(document.querySelectorAll('#bg_list input')).filter(function (i) { return i.value !== i.getAttribute('data-o'); })
       .map(function (i) { return [Number(i.getAttribute('data-r')), i.value === '' ? '' : Number(i.value)]; });
-    if (!ch.length) { closeSheet(); if (then) then(); return; }
+    var lab = $('bg_labor'), labCh = lab.value !== lab.getAttribute('data-o');
+    if (!ch.length && !labCh) { closeSheet(); if (then) then(); return; }
     b.disabled = true; b.textContent = t('Saving…');
-    api('fieldSaveBudget', [tab, ch], newId()).then(function (r) {
+    api('fieldSaveBudget', labCh ? [tab, ch, lab.value === '' ? '' : Number(lab.value)] : [tab, ch], newId()).then(function (r) {
       toast(t('Budget saved: {x} total', { x: money(r.budget) })); loadProject(tab); refresh();
       if (then) then(); else closeSheet();
     }, function (e) { b.disabled = false; b.textContent = t('Save budget'); fail(e); });
@@ -811,14 +974,17 @@ function receiveSheet(tab, row, n, name) {
   openSheet(name, function () {
     return '<div class="sub">' + esc(tab) + '</div>' +
       (stored.length ? '<div class="sec">' + t('Where is it now?') + '</div><div class="chips">' + stored.map(function (w) { return '<button class="chip" ' + on(function (e, el) { where = w; pickOne(el); }) + '>' + esc(w) + '</button>'; }).join('') + '</div>' : '') +
-      '<div class="sec">' + t('Packing slip or receipt (optional)') + '</div>' +
-      '<label class="photo" id="rc_lbl">' + CAM + t('Take or pick a photo') + '<input type="file" accept="image/*" id="rc_file" ' + on(function (e, el) { $('rc_lbl').className = 'photo' + (el.files[0] ? ' has' : ''); }, 'onchange') + '></label>' +
+      '<div class="sec">' + t('Receipt and price (optional)') + '</div>' + priceBlock('rc') +
       '<button class="primary" ' + on(function () {
-        var inp = $('rc_file'); closeSheet();
-        save('fieldReceive', [tab, row, { storedAt: where, n: n }], t('Received') + ' · ' + name, t('{x}: received', { x: name }));
-        if (inp.files && inp.files[0]) photo(tab, row, n, 'inv', inp, name);
+        var p = { storedAt: where, n: n }, tot = $('rc_total').value;
+        if (tot) p.total = tot;
+        if ($('rc_vendor').value.trim()) p.vendor = $('rc_vendor').value.trim();
+        if (RECEIPT) { p.name = RECEIPT.name; p.mime = RECEIPT.mime; p.data = RECEIPT.data; }
+        closeSheet();
+        save('fieldReceive', [tab, row, p], t('Received') + ' · ' + name, t('{x}: received', { x: name }));
       }) + '>' + t('Mark received') + '</button>';
   });
+  priceWire('rc');
 }
 function decideSheet(tab, row, n, name, status) {
   openSheet(name, function () {
@@ -1007,7 +1173,9 @@ function formMaterial(tab) {
     return '<div class="sub">' + esc(tab) + '</div>' +
       '<label class="photo scan" id="am_lbl">🧾 ' + t('Scan a receipt') + '<input id="am_file" type="file" accept="image/*" ' + on(function (e, el) { scanReceipt(el); }, 'onchange') + '></label>' +
       '<div class="hint" id="am_read">' + t('The app reads the store and total for you. Or fill it in below.') + '</div>' +
-      field(t('What is it?'), '<input id="am_item" placeholder="' + esc(t('2x4 studs, tile, vanity…')) + '">') +
+      (openItems(tab).length ? field(t('For something already on this job?'), '<select id="am_for" onchange="amFor()"><option value="">' + esc(t('No, a new item')) + '</option>' +
+        openItems(tab).map(function (x, i) { return '<option value="' + i + '">' + esc(x.name) + ' · ' + esc(t(x.status || 'Needed')) + '</option>'; }).join('') + '</select>') : '') +
+      '<div id="am_new">' + field(t('What is it?'), '<input id="am_item" placeholder="' + esc(t('2x4 studs, tile, vanity…')) + '">') +
       '<div class="two"><div>' + field(t('Total cost ($)'), '<input id="am_total" type="number" inputmode="decimal" min="0" step="0.01">') + '</div><div>' + field(t('Where from?'), '<input id="am_vendor" list="am_vendors"><datalist id="am_vendors">' + opts(LISTS.vendors) + '</datalist>') + '</div></div>' +
       '<div class="sec">' + t('Is it here yet?') + '</div><div class="chips" id="am_status">' + ['Delivered', 'Ordered', 'Needed'].map(function (s, i) {
         return '<button class="chip' + (i === 0 ? ' on' : '') + '" data-v="' + s + '" ' + on(function (e, el) { pickOne(el); }) + '>' + { Delivered: t('Have it'), Ordered: t('Ordered'), Needed: t('Still need it') }[s] + '</button>';
@@ -1015,8 +1183,8 @@ function formMaterial(tab) {
       '<details style="margin-top:14px"><summary class="linkbtn">' + t('More details (category, where stored, step)') + '</summary>' +
       '<div class="two"><div>' + field(t('Category'), '<select id="am_cat">' + opts(LISTS.invCat, '', true) + '</select>') + '</div><div>' + field(t('Stored at'), '<select id="am_stored">' + opts(LISTS.stored, '', true) + '</select>') + '</div></div>' +
       '<div class="two"><div>' + field(t('Qty'), '<input id="am_qty" type="number" inputmode="decimal" min="0" value="1">') + '</div><div>' + field(t('For step #'), '<input id="am_step" type="number" inputmode="numeric">') + '</div></div>' +
-      field(t('Room / area'), '<input id="am_room">') + field(t('Notes'), '<input id="am_note">') + '</details>' +
-      '<button class="primary" ' + on(function () { saveMaterial(tab); }) + '>' + t('Add material') + '</button>';
+      field(t('Room / area'), '<input id="am_room">') + field(t('Notes'), '<input id="am_note">') + '</details></div>' +
+      '<button class="primary" id="am_go" ' + on(function () { saveMaterial(tab); }) + '>' + t('Add material') + '</button>';
   });
 }
 function scanReceipt(input) {
@@ -1038,7 +1206,26 @@ function scanReceipt(input) {
     });
   });
 }
+function openItems(tab) { return ((PROJ[tab] && PROJ[tab].deliveries) || []).filter(function (x) { var g = matGroup(x); return g === 'need' || g === 'way'; }); }
+// picking an item already on the job: the receipt marks that item received with its price, no second line
+function amFor() {
+  var on_ = $('am_for').value !== '';
+  [].forEach.call(document.querySelectorAll('#am_new > *'), function (el) { if (!el.querySelector || !el.querySelector('#am_total, #am_vendor')) el.style.display = on_ ? 'none' : ''; });
+  $('am_go').textContent = on_ ? t('Mark received with this receipt') : t('Add material');
+}
 function saveMaterial(tab) {
+  var pick = $('am_for') && $('am_for').value !== '' ? openItems(tab)[Number($('am_for').value)] : null;
+  if (pick) {
+    var p = { n: pick.n };
+    if ($('am_total').value) p.total = $('am_total').value;
+    if ($('am_vendor').value.trim()) p.vendor = $('am_vendor').value.trim();
+    var send = function (f) {
+      if (f) { p.name = f.name; p.mime = f.mime; p.data = f.data; }
+      closeSheet(); save('fieldReceive', [tab, pick.row, p], t('Received') + ' · ' + pick.name, t('{x}: received', { x: pick.name }));
+    };
+    if (RECEIPT) send(RECEIPT); else withFile($('am_file'), send);
+    return;
+  }
   var st = document.querySelector('#am_status .on');
   var p = { item: $('am_item').value.trim(), vendor: $('am_vendor').value.trim(), status: st ? st.getAttribute('data-v') : 'Delivered', total: $('am_total').value, qty: $('am_qty').value,
             stored: $('am_stored').value, cat: $('am_cat').value, step: $('am_step').value, room: $('am_room').value.trim(), note: $('am_note').value.trim(), who: ME };

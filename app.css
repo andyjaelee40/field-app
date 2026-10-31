@@ -202,3 +202,11 @@ img.big { display:block; width:100%; border-radius:14px; margin-top:6px; }
 .primary.soft.danger-text { color:var(--red); }
 .photo.scan { border-color:var(--clay); color:var(--clay); }
 .sheet-card h3 { margin:4px 0 6px; font-size:19px; font-weight:600; } .sheet-card p { color:var(--ink); line-height:1.45; }
+
+/* labor */
+.shopbtn.checkin { border-color:var(--clay); } .shopbtn.checkin.done { border-color:var(--grn); } .shopbtn.checkin.done .si { background:var(--grnbg); color:var(--grn); font-weight:700; }
+.shopbtn .si.lab { background:var(--ambbg); }
+.chips.col { flex-direction:column; } .chips.col .chip { text-align:left; border-radius:14px; padding:14px 16px; }
+.mrow.pay b { display:flex; justify-content:space-between; gap:10px; } .mrow.pay b span { font-weight:600; }
+.amt1 { font-weight:600; flex:0 0 auto; }
+.bgrow.lab { border-bottom:2px solid var(--line); }
